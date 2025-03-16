@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pomondoro Focus App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @keyframes grow {
+        from {
+          transform: scale(0.5);
+        }
+        to {
+          transform: scale(1);
+        }
+      }
+
+      .progress-ring__circle {
+        transition: stroke-dashoffset 0.35s;
+        transform: rotate(-90deg);
+        transform-origin: 50% 50%;
+      }
+
+      .growing-tree {
+        animation: grow 1s ease-in-out infinite alternate;
+      }
+
+      .day-bar {
+        transition: height 0.5s ease-in-out;
+      }
+    </style>
+  </head>
+  <body class="dark:bg-gray-900 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+      <!-- Header Section -->
+      <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold dark:text-white">🌳 Pomondoro Focus</h1>
+        <button
+          id="themeToggle"
+          class="p-2 rounded-full dark:bg-gray-700 bg-gray-200"
+        >
+          🌓
+        </button>
+      </div>
+
+      <!-- Main Timer Section -->
+      <div class="max-w-md mx-auto mb-12 relative">
+        <div class="relative w-64 h-64 mx-auto">
+          <svg class="progress-ring w-64 h-64 absolute" id="timerRing">
+            <circle
+              class="progress-ring__circle"
+              stroke-width="4"
+              fill="transparent"
+              r="120"
+              cx="128"
+              cy="128"
+            />
+          </svg>
+          <div
+            class="absolute inset-0 flex flex-col items-center justify-center"
+          >
+            <div id="timeDisplay" class="text-4xl font-bold dark:text-white">
+              25:00
+            </div>
+            <div id="statusText" class="text-gray-600 dark:text-gray-300">
+              Focus Time
+            </div>
+          </div>
+        </div>
+        <div class="text-center mt-8" id="tree">🌱</div>
+      </div>
+
+      <!-- Controls Section -->
+      <div class="flex flex-col items-center gap-4 mb-12">
+        <div class="flex gap-2">
+          <select
+            id="focusTime"
+            class="p-2 rounded-lg dark:bg-gray-700 dark:text-white"
+          >
+            <option value="25">25 Minutes</option>
+            <option value="50">50 Minutes</option>
+            <option value="85">85 Minutes</option>
+          </select>
+          <button
+            id="startBtn"
+            class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+          >
+            Start Focus
+          </button>
+          <button
+            id="skipBtn"
+            class="px-6 py-2 bg-yellow-500 text-white rounded-lg hidden"
+          >
+            Skip Break
+          </button>
+        </div>
+        <div class="flex items-center gap-2 dark:text-white">
+          <input type="checkbox" id="youtubeEnabled" class="rounded" />
+          <label>Enable YouTube Music</label>
+        </div>
+      </div>
+
+      <!-- Stats Section -->
+      <div class="grid md:grid-cols-3 gap-6 mb-12">
+        <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
+          <h3 class="text-xl font-bold mb-2 dark:text-white">Today's Focus</h3>
+          <div class="text-3xl dark:text-green-400" id="todayHours">0h</div>
+        </div>
+        <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
+          <h3 class="text-xl font-bold mb-2 dark:text-white">Streak</h3>
+          <div class="text-3xl dark:text-yellow-400" id="streak">0🔥</div>
+        </div>
+        <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
+          <h3 class="text-xl font-bold mb-2 dark:text-white">Weekly Focus</h3>
+          <div class="flex justify-between h-32 items-end" id="weekBars"></div>
+        </div>
+      </div>
+
+      <!-- YouTube Player -->
+      <div id="youtubePlayer" class="hidden max-w-md mx-auto mb-12">
+        <iframe
+          class="w-full aspect-video rounded-lg"
+          src="about:blank"
+        ></iframe>
+      </div>
+
+      <audio
+        id="alertSound"
+        src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"
+      ></audio>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>
