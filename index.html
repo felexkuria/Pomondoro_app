@@ -28,54 +28,74 @@
       .day-bar {
         transition: height 0.5s ease-in-out;
       }
+
+      @media (min-width: 1920px) {
+        .container {
+          max-width: 1800px;
+        }
+
+        .text-3xl {
+          font-size: 2.5rem;
+        }
+
+        .text-4xl {
+          font-size: 3.5rem;
+        }
+
+        .text-xl {
+          font-size: 1.5rem;
+        }
+      }
     </style>
   </head>
   <body class="dark:bg-gray-900 min-h-screen">
-    <div class="container mx-auto px-4 py-8">
+    <div class="container mx-auto px-8 py-12">
       <!-- Header Section -->
-      <div class="flex justify-between items-center mb-8">
-        <h1 class="text-3xl font-bold dark:text-white">🌳 Pomondoro Focus</h1>
+      <div class="flex justify-between items-center mb-12">
+        <h1 class="text-3xl lg:text-5xl font-bold dark:text-white">
+          🌳 Pomondoro Focus
+        </h1>
         <button
           id="themeToggle"
-          class="p-2 rounded-full dark:bg-gray-700 bg-gray-200"
+          class="p-4 rounded-full dark:bg-gray-700 bg-gray-200 text-2xl"
         >
           🌓
         </button>
       </div>
 
       <!-- Main Timer Section -->
-      <div class="max-w-md mx-auto mb-12 relative">
-        <div class="relative w-64 h-64 mx-auto">
-          <svg class="progress-ring w-64 h-64 absolute" id="timerRing">
+      <div class="max-w-2xl mx-auto mb-16 relative">
+        <div class="relative w-96 h-96 mx-auto">
+          <svg class="progress-ring w-96 h-96 absolute" id="timerRing">
             <circle
               class="progress-ring__circle"
-              stroke-width="4"
+              stroke-width="6"
               fill="transparent"
-              r="120"
-              cx="128"
-              cy="128"
+              r="180"
+              cx="192"
+              cy="192"
             />
           </svg>
           <div
             class="absolute inset-0 flex flex-col items-center justify-center"
           >
-            <div id="timeDisplay" class="text-4xl font-bold dark:text-white">
+            <div id="timeDisplay" class="text-6xl font-bold dark:text-white">
               25:00
             </div>
-            <div id="statusText" class="text-gray-600 dark:text-gray-300">
+            <div id="statusText" class="text-2xl dark:text-gray-300">
               Focus Time
             </div>
           </div>
         </div>
-        <div class="text-center mt-8" id="tree">🌱</div>
+        <div class="text-center mt-12 text-6xl" id="tree">🌱</div>
       </div>
 
       <!-- Controls Section -->
-      <div class="flex flex-col items-center gap-4 mb-12">
-        <div class="flex gap-2">
+      <div class="flex flex-col items-center gap-6 mb-16">
+        <div class="flex gap-4">
           <select
             id="focusTime"
-            class="p-2 rounded-lg dark:bg-gray-700 dark:text-white"
+            class="p-4 text-xl rounded-lg dark:bg-gray-700 dark:text-white"
           >
             <option value="25">25 Minutes</option>
             <option value="50">50 Minutes</option>
@@ -83,41 +103,41 @@
           </select>
           <button
             id="startBtn"
-            class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+            class="px-8 py-4 text-xl bg-green-500 text-white rounded-lg hover:bg-green-600"
           >
             Start Focus
           </button>
           <button
             id="skipBtn"
-            class="px-6 py-2 bg-yellow-500 text-white rounded-lg hidden"
+            class="px-8 py-4 text-xl bg-yellow-500 text-white rounded-lg hidden"
           >
             Skip Break
           </button>
         </div>
-        <div class="flex items-center gap-2 dark:text-white">
-          <input type="checkbox" id="youtubeEnabled" class="rounded" />
+        <div class="flex items-center gap-3 dark:text-white text-xl">
+          <input type="checkbox" id="youtubeEnabled" class="w-6 h-6 rounded" />
           <label>Enable YouTube Music</label>
         </div>
       </div>
 
       <!-- Stats Section -->
-      <div class="grid md:grid-cols-3 gap-6 mb-12">
-        <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
-          <h3 class="text-xl font-bold mb-2 dark:text-white">Today's Focus</h3>
-          <div class="text-3xl dark:text-green-400" id="todayHours">0h</div>
+      <div class="grid md:grid-cols-3 gap-8 mb-16">
+        <div class="p-8 bg-white dark:bg-gray-800 rounded-xl shadow">
+          <h3 class="text-2xl font-bold mb-4 dark:text-white">Today's Focus</h3>
+          <div class="text-5xl dark:text-green-400" id="todayHours">0h</div>
         </div>
-        <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
-          <h3 class="text-xl font-bold mb-2 dark:text-white">Streak</h3>
-          <div class="text-3xl dark:text-yellow-400" id="streak">0🔥</div>
+        <div class="p-8 bg-white dark:bg-gray-800 rounded-xl shadow">
+          <h3 class="text-2xl font-bold mb-4 dark:text-white">Streak</h3>
+          <div class="text-5xl dark:text-yellow-400" id="streak">0🔥</div>
         </div>
-        <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
-          <h3 class="text-xl font-bold mb-2 dark:text-white">Weekly Focus</h3>
-          <div class="flex justify-between h-32 items-end" id="weekBars"></div>
+        <div class="p-8 bg-white dark:bg-gray-800 rounded-xl shadow">
+          <h3 class="text-2xl font-bold mb-4 dark:text-white">Weekly Focus</h3>
+          <div class="flex justify-between h-48 items-end" id="weekBars"></div>
         </div>
       </div>
 
       <!-- YouTube Player -->
-      <div id="youtubePlayer" class="hidden max-w-md mx-auto mb-12">
+      <div id="youtubePlayer" class="hidden max-w-4xl mx-auto mb-16">
         <iframe
           class="w-full aspect-video rounded-lg"
           src="about:blank"
