@@ -38,11 +38,10 @@
     // -------------------- YouTube Music (Basic Embed Logic) --------------------
     function playBreakMusic() {
       if (musicEnabled) {
-     
-        youtubePlayer.src = "https://www.youtube.com/embed/v=jfKfPfyJRdk?autoplay=1";
-        musicPlayer.classList.remove('hidden');
-      }
-    }
+    // Fix: Corrected YouTube embed URL format by removing extra 'v='
+    youtubePlayer.src = "https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1";
+    musicPlayer.classList.remove('hidden');
+}    }
     function stopBreakMusic() {
       youtubePlayer.src = "";
       musicPlayer.classList.add('hidden');

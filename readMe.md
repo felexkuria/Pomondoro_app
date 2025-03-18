@@ -1,4 +1,3 @@
-````markdown
 # Focus Flow - Pomodoro Timer App 🌳
 
 A modern, gamified Pomodoro timer application to help you stay focused and track your productivity.
@@ -74,4 +73,3 @@ The app includes two theme modes:
   --accent: #64B5F6;
   --warning: #FF5252;
 ```
-````
