@@ -128,17 +128,17 @@
       </div>
 
       <!-- Main Content Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-16 mb-24">
         <!-- Timer Container -->
-        <div class="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        <div class="p-12 bg-gray-100 dark:bg-gray-800 rounded-2xl">
           <!-- Tree Animation -->
-          <div id="treeContainer" class="tree-bounce mb-8 text-center">
-            <div id="tree" class="text-6xl">🌱</div>
+          <div id="treeContainer" class="tree-bounce mb-16 text-center">
+            <div id="tree" class="text-8xl">🌱</div>
           </div>
 
           <!-- Circular Timer -->
           <div
-            class="relative w-64 h-64 mx-auto"
+            class="relative w-96 h-96 mx-auto"
             style="display: flex; justify-content: center; align-items: center"
           >
             <svg class="absolute" viewBox="0 0 100 100">
@@ -162,31 +162,31 @@
             </svg>
             <div
               id="timerDisplay"
-              class="absolute inset-0 flex items-center justify-center text-3xl font-bold"
+              class="absolute inset-0 flex items-center justify-center text-6xl font-bold"
             >
               25:00
             </div>
           </div>
 
           <!-- Timer Controls -->
-          <div class="flex flex-col gap-4 items-center mt-8">
-            <div class="flex gap-4 items-center">
-              <div class="flex gap-2 items-center">
-                <label for="focusTime" class="font-semibold">Focus:</label>
+          <div class="flex flex-col gap-8 items-center mt-16">
+            <div class="flex gap-8 items-center">
+              <div class="flex gap-4 items-center">
+                <label for="focusTime" class="font-semibold text-2xl">Focus:</label>
                 <select
                   id="focusTime"
-                  class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800"
+                  class="px-6 py-4 rounded-xl bg-gray-100 dark:bg-gray-800 text-xl"
                 >
                   <option value="25">25 min</option>
                   <option value="30">30 min</option>
                   <option value="45">45 min</option>
                 </select>
               </div>
-              <div class="flex gap-2 items-center">
-                <label for="breakTime" class="font-semibold">Break:</label>
+              <div class="flex gap-4 items-center">
+                <label for="breakTime" class="font-semibold text-2xl">Break:</label>
                 <select
                   id="breakTime"
-                  class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800"
+                  class="px-6 py-4 rounded-xl bg-gray-100 dark:bg-gray-800 text-xl"
                 >
                   <option value="5">5 min</option>
                   <option value="10">10 min</option>
@@ -194,28 +194,28 @@
                 </select>
               </div>
             </div>
-            <div class="flex gap-4">
+            <div class="flex gap-8">
               <button
                 id="startButton"
-                class="px-6 py-2 bg-green-500 text-white rounded-lg"
+                class="px-12 py-4 bg-green-500 text-white rounded-xl text-2xl"
               >
                 Start
               </button>
               <button
                 id="stopButton"
-                class="px-6 py-2 bg-red-500 text-white rounded-lg hidden"
+                class="px-12 py-4 bg-red-500 text-white rounded-xl text-2xl hidden"
               >
                 Stop
               </button>
               <button
                 id="pauseButton"
-                class="px-6 py-2 bg-yellow-500 text-white rounded-lg hidden"
+                class="px-12 py-4 bg-yellow-500 text-white rounded-xl text-2xl hidden"
               >
                 Pause
               </button>
               <button
                 id="skipBreak"
-                class="px-4 py-2 bg-blue-500 text-white rounded-lg hidden"
+                class="px-8 py-4 bg-blue-500 text-white rounded-xl text-2xl hidden"
               >
                 Skip Break
               </button>
@@ -224,7 +224,7 @@
         </div>
 
         <!-- Spotify Container -->
-        <div class="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        <div class="p-12 bg-gray-100 dark:bg-gray-800 rounded-2xl">
           <div class="spotify-container h-full">
             <iframe
               src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1"
@@ -234,7 +234,7 @@
               allowfullscreen
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="lazy"
-              style="min-height: 800px;"
+              style="min-height: 1000px;"
             >
             </iframe>
           </div>
