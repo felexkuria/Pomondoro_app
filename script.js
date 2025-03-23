@@ -116,11 +116,11 @@ if (loadButton) {
 
 function playBreakMusic() {
   if (musicEnabled) {
-    const storedVideoUrl = localStorage.getItem('videoUrl');
+    const videoUrlInput = document.getElementById('videoUrl');
     let videoId = 'jfKfPfyJRdk'; // Default video ID
 
-    if (storedVideoUrl) {
-      const extracted = extractYoutubeId(storedVideoUrl);
+    if (videoUrlInput && videoUrlInput.value) {
+      const extracted = extractYoutubeId(videoUrlInput.value);
       if (extracted) {
         videoId = extracted;
       } else {
