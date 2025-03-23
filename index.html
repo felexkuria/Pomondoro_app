@@ -8,7 +8,6 @@
       content="A Pomodoro Focus App that helps you manage your work and break sessions effectively. Features include customizable focus/break timers, streak tracking, weekly focus visualization, and ambient music options to enhance your productivity."
     />
     <meta name="author" content="Felex Kuria" />
-    <!-- Allow standalone installation -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Pomondoro Focus App" />
@@ -20,81 +19,200 @@
 
     <link rel="manifest" href="manifest.json" />
     <title>Pomondoro Focus App</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      @media screen and (min-width: 1920px) {
-        .max-w-screen-xl {
-          max-width: 3840px;
-        }
-        
-        .text-3xl {
-          font-size: 4.5rem; 
-        }
-        
-        .text-6xl {
-          font-size: 9rem;
-        }
-        
-        .text-xl {
-          font-size: 3rem;
-        }
-        
-        .text-2xl {
-          font-size: 3.75rem;
-        }
+      /* Base styles */
+      :root {
+        --base-font-size: 16px;
+        --scale-factor: 1;
+      }
 
-        .w-64 {
-          width: 36rem;
-        }
-
-        .h-64 {
-          height: 36rem;
-        }
-
-        .h-40 {
-          height: 24rem;
+      /* 4K screens */
+      @media screen and (min-width: 2560px) {
+        :root {
+          --scale-factor: 2;
         }
       }
 
-      /* Animated dashed circle for timer */
+      /* Large screens */
+      @media screen and (min-width: 1920px) {
+        :root {
+          --scale-factor: 1.5;
+        }
+      }
+
+      /* Mobile devices */
+      @media screen and (max-width: 768px) {
+        :root {
+          --scale-factor: 0.8;
+        }
+      }
+
+      /* Responsive typography */
+      .text-3xl {
+        font-size: calc(1.875rem * var(--scale-factor));
+      }
+      .text-6xl {
+        font-size: calc(3.75rem * var(--scale-factor));
+      }
+      .text-xl {
+        font-size: calc(1.25rem * var(--scale-factor));
+      }
+      .text-2xl {
+        font-size: calc(1.5rem * var(--scale-factor));
+      }
+      .text-8xl {
+        font-size: calc(6rem * var(--scale-factor));
+      }
+
+      /* Responsive spacing */
+      .w-64 {
+        width: calc(16rem * var(--scale-factor));
+      }
+      .h-64 {
+        height: calc(16rem * var(--scale-factor));
+      }
+      .h-40 {
+        height: calc(10rem * var(--scale-factor));
+      }
+      .w-96 {
+        width: calc(24rem * var(--scale-factor));
+      }
+      .h-96 {
+        height: calc(24rem * var(--scale-factor));
+      }
+
+      .p-12 {
+        padding: calc(3rem * var(--scale-factor));
+      }
+      .p-6 {
+        padding: calc(1.5rem * var(--scale-factor));
+      }
+      .px-12 {
+        padding-left: calc(3rem * var(--scale-factor));
+        padding-right: calc(3rem * var(--scale-factor));
+      }
+      .py-4 {
+        padding-top: calc(1rem * var(--scale-factor));
+        padding-bottom: calc(1rem * var(--scale-factor));
+      }
+      .px-6 {
+        padding-left: calc(1.5rem * var (--scale-factor));
+        padding-right: calc(1.5rem * var(--scale-factor));
+      }
+
+      .gap-8 {
+        gap: calc(2rem * var(--scale-factor));
+      }
+      .gap-4 {
+        gap: calc(1rem * var(--scale-factor));
+      }
+      .gap-16 {
+        gap: calc(4rem * var(--scale-factor));
+      }
+
+      .mb-8 {
+        margin-bottom: calc(2rem * var(--scale-factor));
+      }
+      .mb-16 {
+        margin-bottom: calc(4rem * var(--scale-factor));
+      }
+      .mb-24 {
+        margin-bottom: calc(6rem * var(--scale-factor));
+      }
+      .mt-16 {
+        margin-top: calc(4rem * var(--scale-factor));
+      }
+      .mt-8 {
+        margin-top: calc(2rem * var(--scale-factor));
+      }
+
+      .rounded-xl {
+        border-radius: calc(0.75rem * var(--scale-factor));
+      }
+      .rounded-2xl {
+        border-radius: calc(1rem * var(--scale-factor));
+      }
+      .rounded-lg {
+        border-radius: calc(0.5rem * var(--scale-factor));
+      }
+
+      /* Container max-width */
+      .max-w-screen-xl {
+        max-width: min(90vw, calc(1920px * var(--scale-factor)));
+        margin: 0 auto;
+      }
+
+      /* Timer animations */
       .dash-ring {
         stroke-dasharray: 283;
         stroke-dashoffset: 283;
         transition: stroke-dashoffset 1s linear;
       }
-      /* Keyframes for bounce animation */
+
       @keyframes bounce {
         0%,
         100% {
           transform: translateY(0);
         }
         50% {
-          transform: translateY(-10px);
+          transform: translateY(calc(-10px * var(--scale-factor)));
         }
       }
+
       /* Container for tree bounce */
       .tree-bounce {
         animation: bounce 1s infinite;
       }
+
       /* Day bar animation for weekly chart */
       .day-bar {
-        transition: height 0.5s ease-in-out;
+        animation: dayBar 1s;
       }
+
       /* spotify container styling next to time in row style */
       .spotify-container {
         max-width: 100%;
-        margin: 0;
-        border-radius: 12px;
+        border: 8px solid #222;
+        border-radius: 1rem;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
         overflow: hidden;
-        min-height: 600px;
+        height: 400px; /* Fixed height */
+        background: #000;
+      }
+
+      @media screen and (min-width: 1920px) {
+        .spotify-container {
+          min-height: calc(300px * var(--scale-factor));
+        }
+      }
+
+      /* Grid layouts */
+      @media (max-width: 768px) {
+        .grid-cols-1 {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (min-width: 769px) {
+        .md\:grid-cols-2 {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .md\:grid-cols-3 {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+
+      /* Update container heights */
+      .timer-container {
+        max-height: 600px;
+        overflow: hidden;
       }
     </style>
   </head>
-  <!-- Rest of the HTML remains unchanged -->
-  <body class="dark:bg-gray-900 dark:text-white min-h-screen">
-    <!-- Original content -->
-     <body class="dark:bg-gray-900 dark:text-white min-h-screen">
+  <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <!-- Main Content -->
     <div class="max-w-screen-xl mx-auto px-4 py-8">
       <!-- Header Controls -->
       <div
@@ -114,32 +232,77 @@
         </div>
         <!-- Music Toggle -->
         <div>
-          <label for="musicToggle" class="mr-2 font-semibold"
-            >Break Time Music:</label
+          <button
+            id="musicToggle"
+            class="px-4 py-2 rounded-lg border-2 transition-colors duration-200"
+            style="
+              background-color: #f44336;
+              color: black;
+              border-color: #f44336;
+            "
           >
-          <input type="checkbox" id="musicToggle" />
-           <!-- URL Input Form (hidden by default) -->
-    <form id="urlForm" class="hidden">
-        <input type="text" id="videoUrl" placeholder="Enter YouTube URL">
-        <button type="submit">Load youtube</button>
-    </form>
+            Enable Music
+          </button>
 
+          <!-- URL Input Form (hidden by default) -->
+          <form id="urlForm" class="hidden mt-4">
+            <input
+              type="text"
+              id="videoUrl"
+              placeholder="Enter YouTube URL"
+              class="px-4 py-2 rounded-lg mr-2 border-2 dark:bg-gray-800"
+            />
+            <button
+              id="loadButton"
+              type="submit"
+              class="px-4 py-2 bg-blue-500 text-white rounded-lg"
+            >
+              Load YouTube
+            </button>
+          </form>
+
+          <div
+            id="snackbar"
+            class="fixed hidden bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-lg opacity-0 transition-opacity duration-300"
+            style="animation: none"
+          ></div>
         </div>
+
+        <style>
+          @keyframes slideIn {
+            from {
+              transform: translate(-50%, 100%);
+              opacity: 0;
+            }
+            to {
+              transform: translate(-50%, 0);
+              opacity: 1;
+            }
+          }
+
+          @keyframes fadeOut {
+            from {
+              opacity: 1;
+            }
+            to {
+              opacity: 0;
+            }
+          }
+        </style>
       </div>
 
       <!-- Main Content Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-16 mb-24">
         <!-- Timer Container -->
-        <div class="p-12 bg-gray-100 dark:bg-gray-800 rounded-2xl">
-          <!-- Tree Animation -->
-          <div id="treeContainer" class="tree-bounce mb-16 text-center">
-            <div id="tree" class="text-8xl">🌱</div>
-          </div>
-
-          <!-- Circular Timer -->
+        <div
+          class="p-12 bg-gray-100 dark:bg-gray-800 rounded-2xl timer-container"
+        >
+          <h2 class="text-3xl font-bold mb-8 text-center">
+            Pomodoro Focus Timer
+          </h2>
+          <!-- Circular Timer Section -->
           <div
-            class="relative w-96 h-96 mx-auto"
-            style="display: flex; justify-content: center; align-items: center"
+            class="relative w-80 h-80 mx-auto flex items-center justify-center"
           >
             <svg class="absolute" viewBox="0 0 100 100">
               <circle
@@ -147,7 +310,7 @@
                 cy="50"
                 r="45"
                 class="fill-none stroke-gray-200 dark:stroke-gray-700"
-                stroke-width="10"
+                stroke-width="8"
               />
               <circle
                 id="timerRing"
@@ -155,38 +318,40 @@
                 cy="50"
                 r="45"
                 class="fill-none stroke-green-500 dash-ring"
-                stroke-width="10"
+                stroke-width="8"
                 stroke-linecap="round"
                 transform="rotate(-90 50 50)"
               />
             </svg>
-            <div
-              id="timerDisplay"
-              class="absolute inset-0 flex items-center justify-center text-6xl font-bold"
-            >
-              25:00
+            <div class="flex flex-col items-center justify-center z-10">
+              <div id="treeContainer" class="tree-bounce text-6xl mb-2">🌱</div>
+              <div id="pauseIcon" class="text-6xl mb-2 hidden">⏸️</div>
+              <div id="timerDisplay" class="text-5xl font-bold">25:00</div>
             </div>
           </div>
-
-          <!-- Timer Controls -->
-          <div class="flex flex-col gap-8 items-center mt-16">
-            <div class="flex gap-8 items-center">
-              <div class="flex gap-4 items-center">
-                <label for="focusTime" class="font-semibold text-2xl">Focus:</label>
+          <!-- Timer Controls ... (unchanged) -->
+          <div class="flex flex-col gap-4 items-center mt-4">
+            <div class="flex gap-4 items-center">
+              <div class="flex gap-2 items-center">
+                <label for="focusTime" class="font-semibold text-xl"
+                  >Focus:</label
+                >
                 <select
                   id="focusTime"
-                  class="px-6 py-4 rounded-xl bg-gray-100 dark:bg-gray-800 text-xl"
+                  class="px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-lg"
                 >
                   <option value="25">25 min</option>
                   <option value="30">30 min</option>
                   <option value="45">45 min</option>
                 </select>
               </div>
-              <div class="flex gap-4 items-center">
-                <label for="breakTime" class="font-semibold text-2xl">Break:</label>
+              <div class="flex gap-2 items-center">
+                <label for="breakTime" class="font-semibold text-xl"
+                  >Break:</label
+                >
                 <select
                   id="breakTime"
-                  class="px-6 py-4 rounded-xl bg-gray-100 dark:bg-gray-800 text-xl"
+                  class="px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-lg"
                 >
                   <option value="5">5 min</option>
                   <option value="10">10 min</option>
@@ -194,28 +359,28 @@
                 </select>
               </div>
             </div>
-            <div class="flex gap-8">
+            <div class="flex gap-4 justify-center mt-2">
               <button
                 id="startButton"
-                class="px-12 py-4 bg-green-500 text-white rounded-xl text-2xl"
+                class="px-6 py-2 bg-green-500 text-white rounded-xl text-lg block"
               >
                 Start
               </button>
               <button
                 id="stopButton"
-                class="px-12 py-4 bg-red-500 text-white rounded-xl text-2xl hidden"
+                class="px-6 py-2 bg-red-500 text-white rounded-xl text-lg hidden"
               >
                 Stop
               </button>
               <button
                 id="pauseButton"
-                class="px-12 py-4 bg-yellow-500 text-white rounded-xl text-2xl hidden"
+                class="px-6 py-2 bg-yellow-500 text-white rounded-xl text-lg block"
               >
                 Pause
               </button>
               <button
                 id="skipBreak"
-                class="px-8 py-4 bg-blue-500 text-white rounded-xl text-2xl hidden"
+                class="px-6 py-2 bg-blue-500 text-white rounded-xl text-lg hidden"
               >
                 Skip Break
               </button>
@@ -223,20 +388,19 @@
           </div>
         </div>
 
-        <!-- Spotify Container -->
+        <!-- Spotify Container (modified min-height from 1000px to 500px) -->
         <div class="p-12 bg-gray-100 dark:bg-gray-800 rounded-2xl">
           <div class="spotify-container h-full">
             <iframe
               src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1"
-              width="100%" 
+              width="100%"
               height="100%"
               frameborder="0"
               allowfullscreen
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="lazy"
-              style="min-height: 1000px;"
-            >
-            </iframe>
+              style="min-height: 500px"
+            ></iframe>
           </div>
         </div>
       </div>
@@ -275,7 +439,7 @@
         Focus Activity: 0h 0m
       </div>
 
-      <!-- YouTube Music Player -->
+      YouTube Music Player
       <div id="musicPlayer" class="mt-8 hidden">
         <iframe
           id="youtubePlayer"
