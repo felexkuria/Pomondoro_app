@@ -10,10 +10,31 @@
     // Maximum focus (in minutes) for full colour intensity (example: 2400 minutes = 40 hours)
     const maxFocusForIntensity = 2400;
     let musicEnabled = localStorage.getItem('musicEnabled') === 'true';
+    let isPaused = false;
+    let timerInterval;
+      
+    const pauseButton = document.getElementById('pauseButton');
+      
+      pauseButton.addEventListener('click', () => {
+        if (!isPaused) {
+          // Pause timer
+          clearInterval(timerInterval);
+          pauseButton.textContent = 'Resume';
+          isPaused = true;
+        } else {
+          // Resume timer
+          startTimer();
+          pauseButton.textContent = 'Pause';
+          isPaused = false;
+        }
+      });
 
+      
     // -------------------- DOM Elements --------------------
     const timerDisplay = document.getElementById('timerDisplay');
-    const timerRing = document.getElementById('timerRing');
+const timerRing = document.getElementById('timerRing');
+
+       const urlForm = document.getElementById('urlForm');
     const startButton = document.getElementById('startButton');
     const stopButton = document.getElementById('stopButton');
     const tree = document.getElementById('tree');
@@ -35,12 +56,35 @@
     const endSound = new Audio('https://actions.google.com/sounds/v1/alerts/beep.ogg');
     const warningSound = new Audio('https://actions.google.com/sounds/v1/alerts/ding.ogg');
 
+    // YouTube ID extraction function
+        function extractYoutubeId(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
     // -------------------- YouTube Music (Basic Embed Logic) --------------------
     function playBreakMusic() {
       if (musicEnabled) {
-    // Fix: Corrected YouTube embed URL format by removing extra 'v='
-    youtubePlayer.src = "https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1";
-    musicPlayer.classList.remove('hidden');
+
+        // Handle form submission
+        urlForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const customMusicUrl = document.getElementById('videoUrl').value;
+            
+            // Extract YouTube ID or use default
+            const videoId = customMusicUrl ? extractYoutubeId(customMusicUrl) : 'jfKfPfyJRdk';
+            
+            if (videoId) {
+                youtubePlayer.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+                musicPlayer.classList.remove('hidden');
+            } else {
+                alert('Invalid YouTube URL!');
+            }
+        });
+        //  const videoId = customMusicUrl ? extractYoutubeId(customMusicUrl) : 'jfKfPfyJRdk';
+        // youtubePlayer.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+        // musicPlayer.classList.remove('hidden');
+  
 }    }
     function stopBreakMusic() {
       youtubePlayer.src = "";
@@ -265,22 +309,33 @@
 
     // -------------------- Theme & Music Toggle --------------------
     function updateTheme() {
-      const selection = themeSelect.value;
-      if (selection === "system") {
-        document.documentElement.classList.toggle('dark', window.matchMedia('(prefers-color-scheme: dark)').matches);
-      } else if (selection === "dark") {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-      localStorage.setItem('theme', selection);
-    }
-    themeSelect.addEventListener('change', updateTheme);
-    const storedTheme = localStorage.getItem('theme') || 'system';
-    themeSelect.value = storedTheme;
-    updateTheme();
+  const selection = themeSelect.value;
+  document.documentElement.classList.remove('dark', 'light');
+  
+  if (selection === "system") {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.classList.add(isDark ? 'dark' : 'light');
+  } else {
+    document.documentElement.classList.add(selection);
+  }
+  
+  localStorage.setItem('theme', selection);
+}
 
-    musicToggle.checked = musicEnabled;
+// Listen for system theme changes
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateTheme);
+
+// Listen for theme select changes
+themeSelect.addEventListener('change', updateTheme);
+
+// Set initial theme
+const storedTheme = localStorage.getItem('theme') || 'system';
+themeSelect.value = storedTheme;
+updateTheme();
+musicToggle.checked = musicEnabled;
+musicToggle.addEventListener('click', () => { 
+   urlForm.classList.toggle('hidden');
+});
     musicToggle.addEventListener('change', () => {
       musicEnabled = musicToggle.checked;
       localStorage.setItem('musicEnabled', musicEnabled);

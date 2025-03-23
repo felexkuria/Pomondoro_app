@@ -23,6 +23,40 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+      @media screen and (min-width: 1920px) {
+        .max-w-screen-xl {
+          max-width: 3840px;
+        }
+        
+        .text-3xl {
+          font-size: 4.5rem; 
+        }
+        
+        .text-6xl {
+          font-size: 9rem;
+        }
+        
+        .text-xl {
+          font-size: 3rem;
+        }
+        
+        .text-2xl {
+          font-size: 3.75rem;
+        }
+
+        .w-64 {
+          width: 36rem;
+        }
+
+        .h-64 {
+          height: 36rem;
+        }
+
+        .h-40 {
+          height: 24rem;
+        }
+      }
+
       /* Animated dashed circle for timer */
       .dash-ring {
         stroke-dasharray: 283;
@@ -47,9 +81,20 @@
       .day-bar {
         transition: height 0.5s ease-in-out;
       }
+      /* spotify container styling next to time in row style */
+      .spotify-container {
+        max-width: 100%;
+        margin: 0;
+        border-radius: 12px;
+        overflow: hidden;
+        min-height: 600px;
+      }
     </style>
   </head>
+  <!-- Rest of the HTML remains unchanged -->
   <body class="dark:bg-gray-900 dark:text-white min-h-screen">
+    <!-- Original content -->
+     <body class="dark:bg-gray-900 dark:text-white min-h-screen">
     <div class="max-w-screen-xl mx-auto px-4 py-8">
       <!-- Header Controls -->
       <div
@@ -70,94 +115,128 @@
         <!-- Music Toggle -->
         <div>
           <label for="musicToggle" class="mr-2 font-semibold"
-            >Break Music:</label
+            >Break Time Music:</label
           >
           <input type="checkbox" id="musicToggle" />
+           <!-- URL Input Form (hidden by default) -->
+    <form id="urlForm" class="hidden">
+        <input type="text" id="videoUrl" placeholder="Enter YouTube URL">
+        <button type="submit">Load youtube</button>
+    </form>
+
         </div>
       </div>
 
-      <!-- Main Timer Section -->
-      <div class="flex flex-col items-center gap-8 mb-12">
-        <!-- Tree Animation: container bounces; inner tree scales and changes based on growth stages -->
-        <div id="treeContainer" class="tree-bounce">
-          <div id="tree" class="text-6xl">🌱</div>
-        </div>
+      <!-- Main Content Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+        <!-- Timer Container -->
+        <div class="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
+          <!-- Tree Animation -->
+          <div id="treeContainer" class="tree-bounce mb-8 text-center">
+            <div id="tree" class="text-6xl">🌱</div>
+          </div>
 
-        <!-- Circular Timer with Animated Dash Border -->
-        <div class="relative w-64 h-64">
-          <svg class="absolute" viewBox="0 0 100 100">
-            <!-- Background Circle -->
-            <circle
-              cx="50"
-              cy="50"
-              r="45"
-              class="fill-none stroke-gray-200 dark:stroke-gray-700"
-              stroke-width="10"
-            />
-            <!-- Animated Timer Circle -->
-            <circle
-              id="timerRing"
-              cx="50"
-              cy="50"
-              r="45"
-              class="fill-none stroke-green-500 dash-ring"
-              stroke-width="10"
-              stroke-linecap="round"
-              transform="rotate(-90 50 50)"
-            />
-          </svg>
+          <!-- Circular Timer -->
           <div
-            id="timerDisplay"
-            class="absolute inset-0 flex items-center justify-center text-3xl font-bold"
+            class="relative w-64 h-64 mx-auto"
+            style="display: flex; justify-content: center; align-items: center"
           >
-            25:00
+            <svg class="absolute" viewBox="0 0 100 100">
+              <circle
+                cx="50"
+                cy="50"
+                r="45"
+                class="fill-none stroke-gray-200 dark:stroke-gray-700"
+                stroke-width="10"
+              />
+              <circle
+                id="timerRing"
+                cx="50"
+                cy="50"
+                r="45"
+                class="fill-none stroke-green-500 dash-ring"
+                stroke-width="10"
+                stroke-linecap="round"
+                transform="rotate(-90 50 50)"
+              />
+            </svg>
+            <div
+              id="timerDisplay"
+              class="absolute inset-0 flex items-center justify-center text-3xl font-bold"
+            >
+              25:00
+            </div>
+          </div>
+
+          <!-- Timer Controls -->
+          <div class="flex flex-col gap-4 items-center mt-8">
+            <div class="flex gap-4 items-center">
+              <div class="flex gap-2 items-center">
+                <label for="focusTime" class="font-semibold">Focus:</label>
+                <select
+                  id="focusTime"
+                  class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800"
+                >
+                  <option value="25">25 min</option>
+                  <option value="30">30 min</option>
+                  <option value="45">45 min</option>
+                </select>
+              </div>
+              <div class="flex gap-2 items-center">
+                <label for="breakTime" class="font-semibold">Break:</label>
+                <select
+                  id="breakTime"
+                  class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800"
+                >
+                  <option value="5">5 min</option>
+                  <option value="10">10 min</option>
+                  <option value="15">15 min</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex gap-4">
+              <button
+                id="startButton"
+                class="px-6 py-2 bg-green-500 text-white rounded-lg"
+              >
+                Start
+              </button>
+              <button
+                id="stopButton"
+                class="px-6 py-2 bg-red-500 text-white rounded-lg hidden"
+              >
+                Stop
+              </button>
+              <button
+                id="pauseButton"
+                class="px-6 py-2 bg-yellow-500 text-white rounded-lg hidden"
+              >
+                Pause
+              </button>
+              <button
+                id="skipBreak"
+                class="px-4 py-2 bg-blue-500 text-white rounded-lg hidden"
+              >
+                Skip Break
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Controls -->
-        <div class="flex flex-col md:flex-row gap-4 items-center">
-          <div class="flex gap-2 items-center">
-            <label for="focusTime" class="font-semibold">Focus:</label>
-            <select
-              id="focusTime"
-              class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800"
+        <!-- Spotify Container -->
+        <div class="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
+          <div class="spotify-container h-full">
+            <iframe
+              src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1"
+              width="100%"
+              height="100%"
+              frameborder="0"
+              allowfullscreen
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy"
             >
-              <option value="25">25 min</option>
-              <option value="30">30 min</option>
-              <option value="45">45 min</option>
-            </select>
+            </iframe>
           </div>
-          <div class="flex gap-2 items-center">
-            <label for="breakTime" class="font-semibold">Break:</label>
-            <select
-              id="breakTime"
-              class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800"
-            >
-              <option value="5">5 min</option>
-              <option value="10">10 min</option>
-              <option value="15">15 min</option>
-            </select>
-          </div>
-          <!-- Start and Stop Buttons -->
-          <button
-            id="startButton"
-            class="px-6 py-2 bg-green-500 text-white rounded-lg"
-          >
-            Start
-          </button>
-          <button
-            id="stopButton"
-            class="px-6 py-2 bg-red-500 text-white rounded-lg hidden"
-          >
-            Stop
-          </button>
-          <!-- Skip Break Button (visible during break) -->
-          <button
-            id="skipBreak"
-            class="px-4 py-2 bg-blue-500 text-white rounded-lg hidden"
-          >
-            Skip Break
-          </button>
         </div>
       </div>
 
@@ -187,7 +266,7 @@
         <div id="focusActivityGrid" class="grid grid-cols-7 gap-2"></div>
       </div>
 
-      <!-- GitHub Activity Tracker (Green box that intensifies with focus) -->
+      <!-- GitHub Activity Tracker -->
       <div
         id="githubTracker"
         class="p-6 rounded-lg mb-8 text-white text-center"
@@ -195,12 +274,12 @@
         Focus Activity: 0h 0m
       </div>
 
-      <!-- YouTube Music Player (hidden by default) -->
+      <!-- YouTube Music Player -->
       <div id="musicPlayer" class="mt-8 hidden">
         <iframe
           id="youtubePlayer"
           width="100%"
-          height="200"
+          height="315"
           frameborder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         >
