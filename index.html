@@ -1,456 +1,1241 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="A Pomodoro Focus App that helps you manage your work and break sessions effectively. Features include customizable focus/break timers, streak tracking, weekly focus visualization, and ambient music options to enhance your productivity."
-    />
-    <meta name="author" content="Felex Kuria" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-    <meta name="apple-mobile-web-app-title" content="Pomondoro Focus App" />
 
-    <link
-      rel="apple-touch-icon"
-      href="https://pics.clipartpng.com/midle/Tree_PNG_Clip_Art-2890.png"
-    />
-
-    <link rel="manifest" href="manifest.json" />
-    <title>Pomondoro Focus App</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-      /* Base styles */
-      :root {
-        --base-font-size: 16px;
-        --scale-factor: 1;
-      }
-
-      /* 4K screens */
-      @media screen and (min-width: 2560px) {
-        :root {
-          --scale-factor: 2;
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="description"
+    content="A Pomodoro Focus App with customizable timers, streaks, tasks, subtasks, and ambient music." />
+  <title>Pomodoro Focus App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Load sql.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            gray: {
+              900: '#0d1117', /* GitHub Dark Bg */
+              800: '#161b22', /* GitHub Panel Bg */
+              700: '#21262d', /* GitHub Border */
+            },
+            green: {
+              400: '#4ade80',
+              900: '#064e3b',
+            }
+          },
+          screens: {
+            'xs': '375px',
+          }
         }
       }
+    }
+  </script>
+  <style>
+    /* Base styles */
+    :root {
+      --base-font-size: 16px;
+    }
 
-      /* Large screens */
-      @media screen and (min-width: 1920px) {
-        :root {
-          --scale-factor: 1.5;
-        }
-      }
+    /* Timer animations */
+    .dash-ring {
+      stroke-dasharray: 283;
+      stroke-dashoffset: 283;
+      transition: stroke-dashoffset 1s linear;
+    }
 
-      /* Mobile devices */
-      @media screen and (max-width: 768px) {
-        :root {
-          --scale-factor: 0.8;
-        }
-      }
+    @keyframes bounce {
 
-      /* Responsive typography */
-      .text-3xl {
-        font-size: calc(1.875rem * var(--scale-factor));
-      }
-      .text-6xl {
-        font-size: calc(3.75rem * var(--scale-factor));
-      }
-      .text-xl {
-        font-size: calc(1.25rem * var(--scale-factor));
-      }
-      .text-2xl {
-        font-size: calc(1.5rem * var(--scale-factor));
-      }
-      .text-8xl {
-        font-size: calc(6rem * var(--scale-factor));
+      0%,
+      100% {
+        transform: translateY(0) scale(var(--scale, 1));
       }
 
-      /* Responsive spacing */
-      .w-64 {
-        width: calc(16rem * var(--scale-factor));
+      50% {
+        transform: translateY(-10px) scale(var(--scale, 1));
       }
-      .h-64 {
-        height: calc(16rem * var(--scale-factor));
-      }
-      .h-40 {
-        height: calc(10rem * var(--scale-factor));
-      }
-      .w-96 {
-        width: calc(24rem * var(--scale-factor));
-      }
-      .h-96 {
-        height: calc(24rem * var(--scale-factor));
-      }
+    }
 
-      .p-12 {
-        padding: calc(3rem * var(--scale-factor));
-      }
-      .p-6 {
-        padding: calc(1.5rem * var(--scale-factor));
-      }
-      .px-12 {
-        padding-left: calc(3rem * var(--scale-factor));
-        padding-right: calc(3rem * var(--scale-factor));
-      }
-      .py-4 {
-        padding-top: calc(1rem * var(--scale-factor));
-        padding-bottom: calc(1rem * var(--scale-factor));
-      }
-      .px-6 {
-        padding-left: calc(1.5rem * var (--scale-factor));
-        padding-right: calc(1.5rem * var(--scale-factor));
-      }
+    .tree-bounce {
+      animation: bounce 2s infinite ease-in-out;
+    }
 
-      .gap-8 {
-        gap: calc(2rem * var(--scale-factor));
-      }
-      .gap-4 {
-        gap: calc(1rem * var(--scale-factor));
-      }
-      .gap-16 {
-        gap: calc(4rem * var(--scale-factor));
-      }
+    /* Focus Music Container */
+    .media-container {
+      border: 4px solid #1f2937;
+      /* dark-gray-800 */
+      border-radius: 1rem;
+      overflow: hidden;
+      height: 100%;
+      min-height: 250px;
+      background: #000;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
 
-      .mb-8 {
-        margin-bottom: calc(2rem * var(--scale-factor));
-      }
-      .mb-16 {
-        margin-bottom: calc(4rem * var(--scale-factor));
-      }
-      .mb-24 {
-        margin-bottom: calc(6rem * var(--scale-factor));
-      }
-      .mt-16 {
-        margin-top: calc(4rem * var(--scale-factor));
-      }
-      .mt-8 {
-        margin-top: calc(2rem * var(--scale-factor));
-      }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
 
-      .rounded-xl {
-        border-radius: calc(0.75rem * var(--scale-factor));
-      }
-      .rounded-2xl {
-        border-radius: calc(1rem * var(--scale-factor));
-      }
-      .rounded-lg {
-        border-radius: calc(0.5rem * var(--scale-factor));
-      }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
 
-      /* Container max-width */
-      .max-w-screen-xl {
-        max-width: min(90vw, calc(1920px * var(--scale-factor)));
-        margin: 0 auto;
-      }
+    ::-webkit-scrollbar-thumb {
+      background: #4ade80;
+      border-radius: 4px;
+    }
 
-      /* Timer animations */
-      .dash-ring {
-        stroke-dasharray: 283;
-        stroke-dashoffset: 283;
-        transition: stroke-dashoffset 1s linear;
-      }
+    .hidden {
+      display: none !important;
+    }
 
-      @keyframes bounce {
-        0%,
-        100% {
-          transform: translateY(0);
-        }
-        50% {
-          transform: translateY(calc(-10px * var(--scale-factor)));
-        }
-      }
+    /* Digital Clock Style */
+    .digital-clock {
+      font-family: 'Courier New', Courier, monospace;
+      text-shadow: 0 0 5px rgba(74, 222, 128, 0.5);
+    }
 
-      /* Container for tree bounce */
-      .tree-bounce {
-        animation: bounce 1s infinite;
-      }
+    /* GitHub Graph Styles */
+    .github-graph {
+      display: grid;
+      grid-template-rows: repeat(7, 10px);
+      grid-auto-flow: column;
+      gap: 3px;
+    }
 
-      /* Day bar animation for weekly chart */
-      .day-bar {
-        animation: dayBar 1s;
+    @media (min-width: 768px) {
+      .github-graph {
+        grid-template-rows: repeat(7, 12px);
       }
+    }
 
-      /* spotify container styling next to time in row style */
-      .spotify-container {
-        max-width: 100%;
-        border: 8px solid #222;
-        border-radius: 1rem;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
-        overflow: hidden;
-        height: 400px; /* Fixed height */
-        background: #000;
+    .contrib-cell {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+
+    @media (min-width: 768px) {
+      .contrib-cell {
+        width: 12px;
+        height: 12px;
       }
+    }
 
-      @media screen and (min-width: 1920px) {
-        .spotify-container {
-          min-height: calc(300px * var(--scale-factor));
-        }
-      }
+    /* Subtask Styles */
+    .subtask-line {
+      position: relative;
+    }
 
-      /* Grid layouts */
-      @media (max-width: 768px) {
-        .grid-cols-1 {
-          grid-template-columns: 1fr;
-        }
-      }
+    .subtask-line::before {
+      content: '';
+      position: absolute;
+      left: -12px;
+      top: -15px;
+      bottom: 50%;
+      width: 2px;
+      background-color: #e5e7eb;
+      /* gray-200 */
+    }
 
-      @media (min-width: 769px) {
-        .md\:grid-cols-2 {
-          grid-template-columns: repeat(2, 1fr);
-        }
+    .dark .subtask-line::before {
+      background-color: #374151;
+      /* gray-700 */
+    }
 
-        .md\:grid-cols-3 {
-          grid-template-columns: repeat(3, 1fr);
-        }
-      }
+    .subtask-line::after {
+      content: '';
+      position: absolute;
+      left: -12px;
+      top: 50%;
+      width: 10px;
+      height: 2px;
+      background-color: #e5e7eb;
+    }
 
-      /* Update container heights */
-      .timer-container {
-        max-height: 600px;
-        overflow: hidden;
-      }
-    </style>
-  </head>
-  <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-    <!-- Main Content -->
-    <div class="max-w-screen-xl mx-auto px-4 py-8">
-      <!-- Header Controls -->
-      <div
-        class="flex flex-col md:flex-row items-center justify-between gap-4 mb-8"
-      >
+    .dark .subtask-line::after {
+      background-color: #374151;
+    }
+  </style>
+</head>
+
+<body
+  class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 min-h-screen pb-32">
+
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+
+    <!-- Top Bar -->
+    <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
+      <div class="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+        <h1 class="text-xl sm:text-2xl font-bold flex items-center gap-2">Focus Flow 🌳</h1>
+
+        <!-- Realtime Clock Display -->
+        <div
+          class="bg-white dark:bg-gray-800 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center w-full sm:w-auto min-w-[160px] shadow-sm">
+          <div id="timeDisplay" class="text-lg sm:text-xl font-bold digital-clock text-green-600 dark:text-green-400">
+            00:00:00</div>
+          <div id="dateDisplay"
+            class="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">
+            Loading...</div>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3 sm:gap-4 justify-center w-full md:w-auto">
         <!-- Theme Toggle -->
-        <div>
-          <label for="themeSelect" class="mr-2 font-semibold">Theme:</label>
-          <select
-            id="themeSelect"
-            class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800"
-          >
-            <option value="system">System</option>
+        <div
+          class="flex items-center gap-2 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700">
+          <i data-lucide="sun" class="w-4 h-4 text-gray-500"></i>
+          <select id="themeSelect" class="bg-transparent text-sm focus:outline-none cursor-pointer">
+            <option value="system">Auto</option>
             <option value="light">Light</option>
             <option value="dark">Dark</option>
           </select>
         </div>
-        <!-- Music Toggle -->
-        <div>
-          <button
-            id="musicToggle"
-            class="px-4 py-2 rounded-lg border-2 transition-colors duration-200"
-            style="
-              background-color: #f44336;
-              color: black;
-              border-color: #f44336;
-            "
-          >
-            Enable Music
-          </button>
 
-          <!-- URL Input Form (hidden by default) -->
-          <form id="urlForm" class="hidden mt-4">
-            <input
-              type="text"
-              id="videoUrl"
-              placeholder="Enter YouTube URL"
-              class="px-4 py-2 rounded-lg mr-2 border-2 dark:bg-gray-800"
-            />
-            <button
-              id="loadButton"
-              type="submit"
-              class="px-4 py-2 bg-blue-500 text-white rounded-lg"
-            >
-              Load YouTube
-            </button>
-          </form>
-
+        <!-- Break Music Toggle -->
+        <div class="relative">
           <div
-            id="snackbar"
-            class="fixed hidden bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-lg opacity-0 transition-opacity duration-300"
-            style="animation: none"
-          ></div>
+            class="flex items-center gap-2 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700">
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="musicToggle" class="sr-only peer">
+              <div
+                class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-green-600">
+              </div>
+              <span class="ml-2 text-xs sm:text-sm font-medium">Break Music</span>
+            </label>
+          </div>
         </div>
-
-        <style>
-          @keyframes slideIn {
-            from {
-              transform: translate(-50%, 100%);
-              opacity: 0;
-            }
-            to {
-              transform: translate(-50%, 0);
-              opacity: 1;
-            }
-          }
-
-          @keyframes fadeOut {
-            from {
-              opacity: 1;
-            }
-            to {
-              opacity: 0;
-            }
-          }
-        </style>
       </div>
+    </div>
 
-      <!-- Main Content Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-16 mb-24">
-        <!-- Timer Container -->
+    <!-- SQL Status Indicator -->
+    <div id="dbStatus" class="text-xs text-center text-gray-400 mb-4 opacity-0 transition-opacity">Database Loaded</div>
+
+    <!-- Main Timer & Tasks Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 mb-12">
+
+      <!-- LEFT COLUMN: Timer (lg:col-span-7) -->
+      <div class="lg:col-span-7 flex flex-col gap-6">
+        <!-- Timer Card -->
         <div
-          class="p-12 bg-gray-100 dark:bg-gray-800 rounded-2xl timer-container"
-        >
-          <h2 class="text-3xl font-bold mb-8 text-center">
-            Pomodoro Focus Timer
-          </h2>
-          <!-- Circular Timer Section -->
-          <div
-            class="relative w-80 h-80 mx-auto flex items-center justify-center"
-          >
-            <svg class="absolute" viewBox="0 0 100 100">
-              <circle
-                cx="50"
-                cy="50"
-                r="45"
-                class="fill-none stroke-gray-200 dark:stroke-gray-700"
-                stroke-width="8"
-              />
-              <circle
-                id="timerRing"
-                cx="50"
-                cy="50"
-                r="45"
-                class="fill-none stroke-green-500 dash-ring"
-                stroke-width="8"
-                stroke-linecap="round"
-                transform="rotate(-90 50 50)"
-              />
+          class="p-6 md:p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl flex flex-col items-center justify-between min-h-[420px] md:min-h-[500px] relative overflow-hidden transition-all">
+
+          <!-- Active Task Indicator -->
+          <div id="currentTaskDisplay"
+            class="absolute top-0 left-0 w-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 py-1.5 px-4 text-center text-xs sm:text-sm font-medium hidden">
+            Current Task: <span id="currentTaskTitle" class="font-bold">Writing Code</span>
+          </div>
+
+          <h2 class="text-xl md:text-2xl font-bold mb-4 mt-6 text-green-600 dark:text-green-400 text-center"
+            id="modeLabel">Focus Session</h2>
+
+          <!-- Circular Timer (Responsive Size) -->
+          <div class="relative w-60 h-60 sm:w-72 sm:h-72 flex items-center justify-center shrink-0">
+            <svg class="absolute w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="45" class="fill-none stroke-gray-200 dark:stroke-gray-700" stroke-width="6" />
+              <circle id="timerRing" cx="50" cy="50" r="45" class="fill-none stroke-green-500 dash-ring"
+                stroke-width="6" stroke-linecap="round" />
             </svg>
-            <div class="flex flex-col items-center justify-center z-10">
-              <div id="treeContainer" class="tree-bounce text-6xl mb-2">🌱</div>
-              <div id="pauseIcon" class="text-6xl mb-2 hidden">⏸️</div>
-              <div id="timerDisplay" class="text-5xl font-bold">25:00</div>
+
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <div id="treeContainer"
+                class="text-5xl sm:text-6xl mb-2 sm:mb-4 transition-transform duration-500 origin-bottom"
+                style="--scale: 1">🌱</div>
+              <div id="pauseIcon" class="text-3xl sm:text-4xl mb-2 hidden animate-pulse">⏸️</div>
+              <div id="timerDisplay" class="text-5xl sm:text-6xl font-mono font-bold tracking-tighter transition-all">
+                25:00</div>
             </div>
           </div>
-          <!-- Timer Controls ... (unchanged) -->
-          <div class="flex flex-col gap-4 items-center mt-4">
-            <div class="flex gap-4 items-center">
-              <div class="flex gap-2 items-center">
-                <label for="focusTime" class="font-semibold text-xl"
-                  >Focus:</label
-                >
-                <select
-                  id="focusTime"
-                  class="px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-lg"
-                >
-                  <option value="25">25 min</option>
-                  <option value="30">30 min</option>
-                  <option value="45">45 min</option>
+
+          <!-- Controls -->
+          <div class="w-full mt-6 sm:mt-8 space-y-6">
+            <!-- Settings -->
+            <div class="flex justify-center gap-4 sm:gap-6 text-xs sm:text-sm">
+              <div class="flex flex-col items-center gap-1">
+                <label for="focusTime" class="font-semibold text-gray-500 dark:text-gray-400">Focus</label>
+                <select id="focusTime"
+                  class="px-3 py-1.5 rounded bg-gray-100 dark:bg-gray-700 border-none outline-none cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition w-20 text-center">
+                  <option value="25">25m</option>
+                  <option value="30">30m</option>
+                  <option value="45">45m</option>
+                  <option value="60">60m</option>
                 </select>
               </div>
-              <div class="flex gap-2 items-center">
-                <label for="breakTime" class="font-semibold text-xl"
-                  >Break:</label
-                >
-                <select
-                  id="breakTime"
-                  class="px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-lg"
-                >
-                  <option value="5">5 min</option>
-                  <option value="10">10 min</option>
-                  <option value="15">15 min</option>
+              <div class="flex flex-col items-center gap-1">
+                <label for="breakTime" class="font-semibold text-gray-500 dark:text-gray-400">Break</label>
+                <select id="breakTime"
+                  class="px-3 py-1.5 rounded bg-gray-100 dark:bg-gray-700 border-none outline-none cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition w-20 text-center">
+                  <option value="5">5m</option>
+                  <option value="10">10m</option>
+                  <option value="15">15m</option>
                 </select>
               </div>
             </div>
-            <div class="flex gap-4 justify-center mt-2">
-              <button
-                id="startButton"
-                class="px-6 py-2 bg-green-500 text-white rounded-xl text-lg block"
-              >
-                Start
+
+            <!-- Buttons -->
+            <div class="flex gap-3 justify-center flex-wrap">
+              <button id="startButton"
+                class="px-6 py-2.5 sm:px-8 sm:py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl shadow-lg hover:shadow-green-500/30 transition-all transform hover:scale-105 active:scale-95 text-sm sm:text-base w-full xs:w-auto">
+                Start Focus
               </button>
-              <button
-                id="stopButton"
-                class="px-6 py-2 bg-red-500 text-white rounded-xl text-lg hidden"
-              >
-                Stop
-              </button>
-              <button
-                id="pauseButton"
-                class="px-6 py-2 bg-yellow-500 text-white rounded-xl text-lg block"
-              >
+              <button id="pauseButton"
+                class="hidden px-6 py-2.5 sm:px-8 sm:py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 text-sm sm:text-base w-full xs:w-auto">
                 Pause
               </button>
-              <button
-                id="skipBreak"
-                class="px-6 py-2 bg-blue-500 text-white rounded-xl text-lg hidden"
-              >
+              <button id="resetButton"
+                class="hidden px-6 py-2.5 sm:px-8 sm:py-3 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 text-sm sm:text-base w-full xs:w-auto">
+                Reset
+              </button>
+              <button id="skipBreak"
+                class="hidden px-6 py-2.5 sm:px-8 sm:py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 text-sm sm:text-base w-full xs:w-auto">
                 Skip Break
               </button>
             </div>
           </div>
         </div>
 
-        <!-- Spotify Container (modified min-height from 1000px to 500px) -->
-        <div class="p-12 bg-gray-100 dark:bg-gray-800 rounded-2xl">
-          <div class="spotify-container h-full">
-            <iframe
-              src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1"
-              width="100%"
-              height="100%"
-              frameborder="0"
-              allowfullscreen
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              loading="lazy"
-              style="min-height: 500px"
-            ></iframe>
+        <!-- Tasks Section -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 sm:p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg sm:text-xl font-bold flex items-center gap-2">
+              <i data-lucide="check-square" class="w-5 h-5"></i> Tasks
+            </h2>
+            <div class="flex gap-2">
+              <button id="toggleSync"
+                class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 p-2 rounded-lg transition-colors"
+                title="Import/Export for Apple Reminders">
+                <i data-lucide="arrow-left-right" class="w-5 h-5"></i>
+              </button>
+              <button id="toggleAddTask"
+                class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 p-2 rounded-lg transition-colors">
+                <i data-lucide="plus" class="w-5 h-5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Sync / Import Modal -->
+          <div id="syncModal"
+            class="hidden mb-4 bg-gray-50 dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+            <h3 class="font-bold text-sm mb-2 flex items-center gap-2">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i> Sync with Apple Reminders
+            </h3>
+            <p class="text-xs text-gray-500 mb-3">
+              Due to browser privacy rules, we cannot directly access your Reminders. Use this bridge instead.
+            </p>
+
+            <div class="flex gap-2 mb-3">
+              <button id="copyToReminders"
+                class="flex-1 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-lg flex items-center justify-center gap-2">
+                <i data-lucide="copy" class="w-3 h-3"></i> Copy Tasks to Clipboard
+              </button>
+            </div>
+
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-3">
+              <label class="block text-xs font-medium mb-1 text-gray-600 dark:text-gray-400">Import from Reminders
+                (Paste text here):</label>
+              <textarea id="importText" rows="3"
+                class="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-800 focus:outline-none mb-2"
+                placeholder="Paste your list..."></textarea>
+              <button id="importTasksBtn"
+                class="w-full px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-xs rounded-lg">
+                Import Tasks
+              </button>
+            </div>
+            <div class="text-right mt-2">
+              <button id="closeSync"
+                class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Close</button>
+            </div>
+          </div>
+
+          <!-- Add/Edit Task Form -->
+          <div id="addTaskForm"
+            class="hidden mb-4 bg-gray-50 dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+            <h3 id="formTitle" class="text-xs font-bold text-gray-500 mb-2 uppercase">Add New Task</h3>
+            <input type="text" id="newTaskTitle" placeholder="What are you working on?"
+              class="w-full mb-3 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 focus:ring-2 focus:ring-green-500 outline-none text-sm">
+            <div class="flex items-center gap-4 mb-3">
+              <span class="text-sm font-semibold">Est Pomodoros:</span>
+              <input type="number" id="newTaskEst" value="1" min="1" max="10"
+                class="w-16 px-2 py-1 rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-800 text-sm">
+            </div>
+            <div class="flex justify-end gap-2">
+              <button id="cancelAddTask"
+                class="px-3 py-1 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Cancel</button>
+              <button id="saveTask"
+                class="px-4 py-1.5 bg-green-500 text-white rounded-lg text-xs font-bold hover:bg-green-600">SAVE</button>
+            </div>
+          </div>
+
+          <!-- Task List -->
+          <div id="taskList" class="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+            <!-- Tasks injected via JS -->
+            <div class="text-center text-gray-500 py-4 italic text-sm">No tasks yet. Add one to get started!</div>
           </div>
         </div>
       </div>
 
-      <!-- Dashboard -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-        <!-- Streak Counter -->
-        <div class="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
-          <h3 class="text-xl font-bold mb-4">Streak</h3>
-          <div id="streakCounter" class="text-2xl">0</div>
-        </div>
-        <!-- Weekly Focus -->
-        <div class="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
-          <h3 class="text-xl font-bold mb-4">Weekly Focus</h3>
-          <div id="weekBars" class="flex h-40 items-end gap-2"></div>
-        </div>
-        <!-- Time Tracking -->
-        <div class="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
-          <h3 class="text-xl font-bold mb-4">Time Tracking</h3>
-          <div>Total Focus: <span id="totalFocus">0h</span></div>
-          <div>Total Break: <span id="totalBreak">0h</span></div>
-        </div>
-      </div>
+      <!-- RIGHT COLUMN: Stats & Music (lg:col-span-5) -->
+      <div class="lg:col-span-5 flex flex-col gap-6">
 
-      <!-- Additional Dashboard Card: Focus Activity -->
-      <div class="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg mb-8">
-        <h3 class="text-xl font-bold mb-4">Focus Activity</h3>
-        <div id="focusActivityGrid" class="grid grid-cols-7 gap-2"></div>
-      </div>
+        <!-- Focus Music (Lofi) Container -->
+        <div class="p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl flex flex-col h-[280px] sm:h-[300px]">
+          <h2 class="text-lg sm:text-xl font-bold mb-4 text-gray-700 dark:text-gray-300 flex items-center gap-2">
+            <i data-lucide="headphones" class="w-5 h-5"></i> Focus Ambience
+          </h2>
+          <div class="media-container flex-1">
+            <iframe src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=0" title="Lofi Girl Radio" width="100%"
+              height="100%" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
+              class="w-full h-full object-cover">
+            </iframe>
+          </div>
+        </div>
 
-      <!-- GitHub Activity Tracker -->
-      <div
-        id="githubTracker"
-        class="p-6 rounded-lg mb-8 text-white text-center"
-      >
-        Focus Activity: 0h 0m
-      </div>
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-2 gap-3 sm:gap-4">
+          <div class="p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <h3 class="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Current Streak</h3>
+            <div id="streakCounter" class="text-xl sm:text-2xl font-bold">...</div>
+          </div>
+          <div class="p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <h3 class="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Total Hours</h3>
+            <div id="totalFocus" class="text-xl sm:text-2xl font-bold text-green-500">...</div>
+          </div>
+        </div>
 
-      <!-- YouTube Music Player -->
-      <!-- <div id="musicPlayer" class="mt-8 hidden">
-        <iframe
-          id="youtubePlayer"
-          width="100%"
-          height="315"
-          frameborder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        >
-        </iframe>
-      </div> -->
+        <!-- GitHub Style Activity Map -->
+        <div class="p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg sm:text-xl font-bold flex items-center gap-2">
+              <i data-lucide="activity" class="w-5 h-5"></i> Activity Map
+            </h3>
+            <div class="text-[10px] sm:text-xs text-gray-500">Last 365 Days</div>
+          </div>
+
+          <div class="overflow-x-auto pb-2 custom-scrollbar">
+            <div id="githubGraph" class="github-graph min-w-max">
+              <!-- Graph injected JS -->
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1.5 sm:gap-2 mt-4 text-[10px] sm:text-xs text-gray-500 justify-end">
+            <span>Less</span>
+            <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-gray-200 dark:bg-gray-800 rounded-[2px]"></div>
+            <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-200 rounded-[2px]"></div>
+            <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-400 rounded-[2px]"></div>
+            <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-600 rounded-[2px]"></div>
+            <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-900 rounded-[2px]"></div>
+            <span>More</span>
+          </div>
+        </div>
+
+        <!-- URL Form for Break Music -->
+        <div id="urlFormContainer"
+          class="hidden p-4 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+          <h3 class="text-sm font-bold mb-2">Break Music Settings</h3>
+          <form id="urlForm" class="flex flex-col sm:flex-row gap-2">
+            <input type="text" id="videoUrl" placeholder="YouTube URL"
+              class="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none" />
+            <button type="submit"
+              class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors font-medium">
+              Save
+            </button>
+          </form>
+        </div>
+
+      </div>
     </div>
-    <script src="script.js"></script>
-  </body>
+
+    <!-- Break Music Player (Bottom Sheet on Mobile, Floating on Desktop) -->
+    <div id="musicPlayer"
+      class="fixed bottom-0 right-0 left-0 md:left-auto md:bottom-4 md:right-4 z-50 transition-transform duration-300 translate-y-[150%] shadow-2xl md:rounded-lg rounded-t-xl overflow-hidden border-t-2 md:border-2 border-blue-500 w-full md:w-80 bg-black h-auto">
+      <div class="bg-blue-600 text-white px-4 py-2 text-sm flex justify-between items-center">
+        <span class="font-bold flex items-center gap-2">🎵 Break Time Music</span>
+        <button id="closeMusicPlayer" class="hover:bg-blue-700 p-1 rounded transition-colors">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="aspect-video w-full">
+        <iframe id="youtubePlayer" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media"
+          class="bg-black w-full h-full">
+        </iframe>
+      </div>
+    </div>
+
+    <!-- Snackbar -->
+    <div id="snackbar"
+      class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-50 opacity-0 transition-opacity duration-300 pointer-events-none text-sm w-max max-w-[90vw] text-center">
+    </div>
+
+  </div>
+
+  <script>
+    // Init Icons
+    lucide.createIcons();
+
+    // -------------------- Realtime Clock Logic --------------------
+    function updateClock() {
+      const now = new Date();
+      const timeElement = document.getElementById('timeDisplay');
+      const dateElement = document.getElementById('dateDisplay');
+
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      timeElement.textContent = `${hours}:${minutes}:${seconds}`;
+
+      const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+      dateElement.textContent = now.toLocaleDateString('en-US', options);
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // -------------------- SQL.js Integration --------------------
+    let db;
+    let SQL;
+    let editingTaskId = null; // Global state for editing
+
+    function saveDB() {
+      if (!db) return;
+      try {
+        const data = db.export();
+        const buffer = new Uint8Array(data);
+        const binary = String.fromCharCode.apply(null, buffer);
+        localStorage.setItem("pomodoro_sqlite_db", btoa(binary));
+      } catch (e) {
+        console.error("Save failed", e);
+      }
+    }
+
+    async function initDB() {
+      const config = {
+        locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}`
+      };
+
+      try {
+        SQL = await initSqlJs(config);
+        const savedDB = localStorage.getItem("pomodoro_sqlite_db");
+
+        if (savedDB) {
+          const binary = atob(savedDB);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          db = new SQL.Database(bytes);
+        } else {
+          db = new SQL.Database();
+        }
+
+        // Create Tables (Analytics Friendly Schema)
+        db.run(`
+                    CREATE TABLE IF NOT EXISTS focus_sessions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        date TEXT,
+                        duration INTEGER,
+                        timestamp INTEGER,
+                        task_id INTEGER
+                    );
+                    CREATE TABLE IF NOT EXISTS app_settings (
+                        key TEXT PRIMARY KEY,
+                        value TEXT
+                    );
+                    CREATE TABLE IF NOT EXISTS tasks (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        title TEXT,
+                        est_pomodoros INTEGER DEFAULT 1,
+                        act_pomodoros INTEGER DEFAULT 0,
+                        is_completed INTEGER DEFAULT 0,
+                        is_active INTEGER DEFAULT 0,
+                        created_at INTEGER,
+                        completed_at INTEGER
+                    );
+                    CREATE TABLE IF NOT EXISTS subtasks (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        parent_task_id INTEGER,
+                        title TEXT,
+                        is_completed INTEGER DEFAULT 0,
+                        created_at INTEGER
+                    );
+                `);
+
+        // Add column if missing (migration for existing users)
+        try {
+          db.run("ALTER TABLE focus_sessions ADD COLUMN task_id INTEGER");
+        } catch (e) { }
+
+        try {
+          db.run("ALTER TABLE tasks ADD COLUMN completed_at INTEGER");
+        } catch (e) { }
+
+        // Init Defaults
+        db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES ('streak', '0')`);
+        db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES ('last_session_date', '')`);
+
+        saveDB();
+        document.getElementById('dbStatus').style.opacity = '1';
+        setTimeout(() => document.getElementById('dbStatus').style.opacity = '0', 3000);
+
+        loadFromDB();
+
+      } catch (err) {
+        console.error("SQL Init Error:", err);
+        showSnackbar("Failed to initialize Database", "error");
+      }
+    }
+
+    // Global State
+    let timerState = {
+      intervalID: null,
+      totalSeconds: 0,
+      remainingSeconds: 0,
+      isPaused: false,
+      mode: "focus"
+    };
+
+    // -------------------- Data Access Layer --------------------
+    function getSetting(key) {
+      if (!db) return null;
+      const stmt = db.prepare("SELECT value FROM app_settings WHERE key = :key");
+      const result = stmt.getAsObject({ ':key': key });
+      stmt.free();
+      return result.value;
+    }
+
+    function setSetting(key, value) {
+      if (!db) return;
+      db.run("INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)", [key, value]);
+      saveDB();
+    }
+
+    // -------------------- Task Logic --------------------
+    const toggleAddTaskBtn = document.getElementById('toggleAddTask');
+    const addTaskForm = document.getElementById('addTaskForm');
+    const cancelAddTaskBtn = document.getElementById('cancelAddTask');
+    const saveTaskBtn = document.getElementById('saveTask');
+    const taskListEl = document.getElementById('taskList');
+    const currentTaskDisplay = document.getElementById('currentTaskDisplay');
+    const currentTaskTitle = document.getElementById('currentTaskTitle');
+    const formTitle = document.getElementById('formTitle');
+
+    toggleAddTaskBtn.addEventListener('click', () => {
+      resetForm();
+      addTaskForm.classList.remove('hidden');
+    });
+
+    cancelAddTaskBtn.addEventListener('click', () => {
+      addTaskForm.classList.add('hidden');
+      resetForm();
+    });
+
+    function resetForm() {
+      document.getElementById('newTaskTitle').value = '';
+      document.getElementById('newTaskEst').value = '1';
+      saveTaskBtn.textContent = 'SAVE';
+      formTitle.textContent = 'ADD NEW TASK';
+      editingTaskId = null;
+    }
+
+    saveTaskBtn.addEventListener('click', () => {
+      const title = document.getElementById('newTaskTitle').value;
+      const est = document.getElementById('newTaskEst').value;
+      if (!title) return;
+
+      if (editingTaskId) {
+        // Update existing task
+        db.run("UPDATE tasks SET title = ?, est_pomodoros = ? WHERE id = ?", [title, est, editingTaskId]);
+        showSnackbar("Task updated!", "success");
+      } else {
+        // Create new task
+        db.run("INSERT INTO tasks (title, est_pomodoros, created_at) VALUES (?, ?, ?)", [title, est, Date.now()]);
+      }
+      saveDB();
+      addTaskForm.classList.add('hidden');
+      resetForm();
+      renderTasks();
+    });
+
+    window.editTask = (id) => {
+      if (!db) return;
+      // Get task details
+      const stmt = db.prepare("SELECT * FROM tasks WHERE id = ?");
+      stmt.bind([id]);
+      if (stmt.step()) {
+        const task = stmt.getAsObject();
+        document.getElementById('newTaskTitle').value = task.title;
+        document.getElementById('newTaskEst').value = task.est_pomodoros;
+
+        editingTaskId = id;
+        saveTaskBtn.textContent = 'UPDATE';
+        formTitle.textContent = 'EDIT TASK';
+        addTaskForm.classList.remove('hidden');
+        // Scroll to form
+        addTaskForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      stmt.free();
+    };
+
+    function renderTasks() {
+      if (!db) return;
+      const tasks = [];
+      const stmt = db.prepare("SELECT * FROM tasks ORDER BY is_completed ASC, created_at DESC");
+      while (stmt.step()) tasks.push(stmt.getAsObject());
+      stmt.free();
+
+      taskListEl.innerHTML = '';
+
+      // Check for Active Task
+      const activeTask = tasks.find(t => t.is_active === 1 && t.is_completed === 0);
+      if (activeTask) {
+        currentTaskDisplay.classList.remove('hidden');
+        currentTaskTitle.textContent = activeTask.title;
+      } else {
+        currentTaskDisplay.classList.add('hidden');
+      }
+
+      if (tasks.length === 0) {
+        taskListEl.innerHTML = '<div class="text-center text-gray-500 py-4 italic text-sm">No tasks yet. Add one to get started!</div>';
+        return;
+      }
+
+      tasks.forEach(task => {
+        // Fetch subtasks for this task
+        const subtasks = [];
+        const subStmt = db.prepare("SELECT * FROM subtasks WHERE parent_task_id = ? ORDER BY created_at ASC");
+        subStmt.bind([task.id]);
+        while (subStmt.step()) subtasks.push(subStmt.getAsObject());
+        subStmt.free();
+
+        const completedSubtasks = subtasks.filter(s => s.is_completed).length;
+        const progressPct = subtasks.length > 0 ? (completedSubtasks / subtasks.length) * 100 : 0;
+
+        const el = document.createElement('div');
+        el.className = `rounded-lg border mb-3 overflow-hidden transition-all ${task.is_active ? 'border-green-500 bg-green-50 dark:bg-green-900/10 dark:border-green-900' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+          } ${task.is_completed ? 'opacity-60' : ''}`;
+
+        let subtasksHtml = '';
+        subtasks.forEach(sub => {
+          subtasksHtml += `
+                        <div class="flex items-center gap-2 py-1 ml-4 subtask-line">
+                             <button onclick="toggleSubtaskComplete(${sub.id}, ${sub.is_completed}, ${task.id})" class="text-gray-400 hover:text-green-500 p-1">
+                                <i data-lucide="${sub.is_completed ? 'check-square' : 'square'}" class="w-4 h-4 ${sub.is_completed ? 'text-green-500' : ''}"></i>
+                             </button>
+                             <span class="text-xs ${sub.is_completed ? 'line-through text-gray-400' : 'text-gray-600 dark:text-gray-300'}">${sub.title}</span>
+                             <button onclick="deleteSubtask(${sub.id}, ${task.id})" class="ml-auto text-gray-400 hover:text-red-400 p-1">
+                                <i data-lucide="x" class="w-3 h-3"></i>
+                             </button>
+                        </div>
+                    `;
+        });
+
+        el.innerHTML = `
+                    <div class="p-3 flex items-start gap-3 group relative">
+                        <div class="flex items-center gap-3 flex-1 cursor-pointer" onclick="setActiveTask(${task.id})">
+                            <button class="text-gray-400 hover:text-green-500 mt-1 p-1" onclick="event.stopPropagation(); toggleTaskComplete(${task.id}, ${task.is_completed})">
+                                <i data-lucide="${task.is_completed ? 'check-circle-2' : 'circle'}" class="w-5 h-5 ${task.is_completed ? 'text-green-500 fill-green-500/20' : ''}"></i>
+                            </button>
+                            <div class="flex-1 overflow-hidden">
+                                <div class="font-medium text-sm truncate ${task.is_completed ? 'line-through text-gray-500' : ''}">${task.title}</div>
+                                ${subtasks.length > 0 ? `
+                                    <div class="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-2">
+                                        <div class="h-full bg-green-500 rounded-full transition-all" style="width: ${progressPct}%"></div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end gap-1">
+                            <div class="text-xs font-mono text-gray-500 font-bold whitespace-nowrap">
+                                <span class="text-base sm:text-lg">${task.act_pomodoros}</span>/<span class="text-xs sm:text-sm">${task.est_pomodoros}</span>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <button class="text-gray-400 hover:text-blue-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); toggleSubtaskInput(${task.id})" title="Add Subtask">
+                                    <i data-lucide="list-plus" class="w-4 h-4"></i>
+                                </button>
+                                <button class="text-gray-400 hover:text-yellow-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); editTask(${task.id})" title="Edit Task">
+                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                </button>
+                                <button class="text-gray-400 hover:text-red-500 transition-opacity p-1" onclick="event.stopPropagation(); deleteTask(${task.id})" title="Delete Task">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="subtask-container-${task.id}" class="px-3 pb-2 ${subtasks.length > 0 ? 'block' : 'hidden'}">
+                        ${subtasksHtml}
+                    </div>
+
+                    <div id="add-subtask-form-${task.id}" class="hidden px-3 pb-3 pt-1 border-t border-gray-100 dark:border-gray-700/50">
+                        <div class="flex gap-2">
+                            <input type="text" id="subtask-input-${task.id}" placeholder="Subtask name..." class="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-green-500">
+                            <button onclick="addSubtask(${task.id})" class="px-2 py-1 bg-green-500 text-white rounded text-xs">Add</button>
+                        </div>
+                    </div>
+                `;
+        taskListEl.appendChild(el);
+      });
+      lucide.createIcons();
+    }
+
+    // -------------------- Sync Logic --------------------
+    const toggleSyncBtn = document.getElementById('toggleSync');
+    const syncModal = document.getElementById('syncModal');
+    const closeSyncBtn = document.getElementById('closeSync');
+    const importTasksBtn = document.getElementById('importTasksBtn');
+    const copyToRemindersBtn = document.getElementById('copyToReminders');
+
+    toggleSyncBtn.addEventListener('click', () => syncModal.classList.remove('hidden'));
+    closeSyncBtn.addEventListener('click', () => syncModal.classList.add('hidden'));
+
+    importTasksBtn.addEventListener('click', () => {
+      const text = document.getElementById('importText').value;
+      if (!text) return;
+      const lines = text.split('\n').filter(line => line.trim() !== '');
+
+      lines.forEach(line => {
+        db.run("INSERT INTO tasks (title, est_pomodoros, created_at) VALUES (?, ?, ?)", [line.trim(), 1, Date.now()]);
+      });
+
+      saveDB();
+      renderTasks();
+      document.getElementById('importText').value = '';
+      syncModal.classList.add('hidden');
+      showSnackbar(`Imported ${lines.length} tasks!`, "success");
+    });
+
+    copyToRemindersBtn.addEventListener('click', () => {
+      if (!db) return;
+      const tasks = [];
+      const stmt = db.prepare("SELECT title FROM tasks WHERE is_completed = 0");
+      while (stmt.step()) tasks.push(stmt.getAsObject().title);
+      stmt.free();
+
+      if (tasks.length === 0) {
+        showSnackbar("No active tasks to copy.", "info");
+        return;
+      }
+
+      const clipboardText = tasks.join('\n');
+      navigator.clipboard.writeText(clipboardText).then(() => {
+        showSnackbar("Copied! Paste into Apple Reminders.", "success");
+      });
+    });
+
+    window.toggleSubtaskInput = (taskId) => {
+      const form = document.getElementById(`add-subtask-form-${taskId}`);
+      const container = document.getElementById(`subtask-container-${taskId}`);
+      form.classList.toggle('hidden');
+    };
+
+    window.addSubtask = (taskId) => {
+      const input = document.getElementById(`subtask-input-${taskId}`);
+      const title = input.value;
+      if (!title) return;
+
+      db.run("INSERT INTO subtasks (parent_task_id, title, created_at) VALUES (?, ?, ?)", [taskId, title, Date.now()]);
+      saveDB();
+      renderTasks();
+    };
+
+    window.deleteSubtask = (subId, taskId) => {
+      db.run("DELETE FROM subtasks WHERE id = ?", [subId]);
+      saveDB();
+      renderTasks();
+    };
+
+    window.toggleSubtaskComplete = (subId, currentStatus, taskId) => {
+      const newStatus = currentStatus ? 0 : 1;
+      db.run("UPDATE subtasks SET is_completed = ? WHERE id = ?", [newStatus, subId]);
+      saveDB();
+      renderTasks();
+    };
+
+    window.setActiveTask = (id) => {
+      // Unset all active
+      db.run("UPDATE tasks SET is_active = 0");
+      // Set new active
+      db.run("UPDATE tasks SET is_active = 1 WHERE id = ?", [id]);
+      saveDB();
+      renderTasks();
+    };
+
+    window.toggleTaskComplete = (id, currentStatus) => {
+      const newStatus = currentStatus ? 0 : 1;
+      const completedAt = newStatus === 1 ? Date.now() : null;
+      db.run("UPDATE tasks SET is_completed = ?, is_active = 0, completed_at = ? WHERE id = ?", [newStatus, completedAt, id]);
+      saveDB();
+      renderTasks();
+    };
+
+    window.deleteTask = (id) => {
+      if (confirm("Delete this task and all its subtasks?")) {
+        db.run("DELETE FROM tasks WHERE id = ?", [id]);
+        db.run("DELETE FROM subtasks WHERE parent_task_id = ?", [id]);
+        saveDB();
+        renderTasks();
+      }
+    }
+
+    // -------------------- Stats & Graph --------------------
+    function loadFromDB() {
+      if (!db) return;
+
+      // Total Focus
+      const resTotal = db.exec("SELECT SUM(duration) as total FROM focus_sessions");
+      const totalMins = resTotal[0]?.values[0][0] || 0;
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      document.getElementById('totalFocus').textContent = `${h}h ${m}m`;
+
+      // Streak
+      const streak = getSetting('streak') || 0;
+      document.getElementById('streakCounter').textContent = `${streak} 🔥`;
+
+      // Render GitHub Graph
+      renderGitHubGraph();
+      renderTasks();
+
+      // Music Setting
+      const musicEnabled = getSetting('music_enabled') === 'true';
+      document.getElementById('musicToggle').checked = musicEnabled;
+      if (musicEnabled) document.getElementById('urlFormContainer').classList.remove('hidden');
+    }
+
+    function renderGitHubGraph() {
+      if (!db) return;
+      const graphEl = document.getElementById('githubGraph');
+      graphEl.innerHTML = '';
+
+      // 1. Get all session data
+      const dataMap = {};
+      const stmt = db.prepare("SELECT date, SUM(duration) as mins FROM focus_sessions GROUP BY date");
+      while (stmt.step()) {
+        const row = stmt.getAsObject();
+        dataMap[row.date] = row.mins;
+      }
+      stmt.free();
+
+      // 2. Generate dates for last 365 days
+      const today = new Date();
+      const totalDays = 365; // Approx
+      const startDate = new Date();
+      startDate.setDate(today.getDate() - totalDays);
+
+      // Normalize start to align somewhat
+      const startDay = startDate.getDay();
+      const daysToSubtract = startDay === 0 ? 6 : startDay - 1; // Mon=0
+      startDate.setDate(startDate.getDate() - daysToSubtract);
+
+      let currentDate = new Date(startDate);
+
+      // Generate cells
+      while (currentDate <= today) {
+        const dateStr = currentDate.toISOString().slice(0, 10);
+        const mins = dataMap[dateStr] || 0;
+
+        // Color Logic
+        let colorClass = 'bg-gray-200 dark:bg-gray-800';
+        if (mins > 0) colorClass = 'bg-green-200';
+        if (mins > 30) colorClass = 'bg-green-300';
+        if (mins > 60) colorClass = 'bg-green-400';
+        if (mins > 120) colorClass = 'bg-green-500';
+        if (mins > 240) colorClass = 'bg-green-900';
+
+        const cell = document.createElement('div');
+        cell.className = `contrib-cell ${colorClass} relative group`;
+
+        // Tooltip
+        const tooltip = document.createElement('div');
+        tooltip.className = 'absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none hidden sm:block';
+        tooltip.innerHTML = `<strong>${mins}m</strong> on ${new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+
+        cell.appendChild(tooltip);
+        graphEl.appendChild(cell);
+
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    }
+
+    // -------------------- Timer & Session Logic --------------------
+    function logSession(duration) {
+      if (!db) return;
+      const today = new Date().toISOString().slice(0, 10);
+      const timestamp = Date.now();
+
+      // Find active task
+      const stmt = db.prepare("SELECT id, act_pomodoros FROM tasks WHERE is_active = 1 LIMIT 1");
+      let taskId = null;
+      if (stmt.step()) {
+        const task = stmt.getAsObject();
+        taskId = task.id;
+        // Update task progress
+        db.run("UPDATE tasks SET act_pomodoros = ? WHERE id = ?", [task.act_pomodoros + 1, task.id]);
+      }
+      stmt.free();
+
+      db.run("INSERT INTO focus_sessions (date, duration, timestamp, task_id) VALUES (?, ?, ?, ?)", [today, duration, timestamp, taskId]);
+
+      // Streak Logic
+      const lastDate = getSetting('last_session_date');
+      let currentStreak = parseInt(getSetting('streak') || 0);
+
+      if (lastDate !== today) {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+        if (lastDate === yesterdayStr) {
+          currentStreak++;
+        } else {
+          currentStreak = 1;
+        }
+        setSetting('streak', currentStreak);
+        setSetting('last_session_date', today);
+      }
+      saveDB();
+      loadFromDB(); // Refresh UI
+    }
+
+    // -------------------- Standard Timer Functions --------------------
+    const timerDisplay = document.getElementById('timerDisplay');
+    const timerRing = document.getElementById('timerRing');
+    const tree = document.getElementById('treeContainer');
+    const pauseIcon = document.getElementById('pauseIcon');
+    const modeLabel = document.getElementById('modeLabel');
+    const startButton = document.getElementById('startButton');
+    const pauseButton = document.getElementById('pauseButton');
+    const resetButton = document.getElementById('resetButton');
+    const skipBreakButton = document.getElementById('skipBreak');
+    const focusSelect = document.getElementById('focusTime');
+    const breakSelect = document.getElementById('breakTime');
+    const musicPlayerContainer = document.getElementById('musicPlayer');
+    const youtubePlayer = document.getElementById('youtubePlayer');
+    const closeMusicPlayerBtn = document.getElementById('closeMusicPlayer');
+    const endSound = new Audio('https://actions.google.com/sounds/v1/alerts/beep.ogg');
+
+    function updateTimerDisplay(seconds, totalSeconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      timerDisplay.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+      const circumference = 283;
+      const offset = circumference - (circumference * (seconds / totalSeconds));
+      timerRing.style.strokeDashoffset = offset;
+      document.title = `(${mins}:${secs.toString().padStart(2, '0')}) ${timerState.mode === 'focus' ? 'Focus' : 'Break'} - Pomodoro`;
+    }
+
+    function animateTree(total, current) {
+      if (!tree) return;
+      const progress = 1 - (current / total);
+      const scale = 1 + (progress * 0.5);
+      tree.style.setProperty('--scale', scale);
+      tree.style.transform = `scale(${scale})`;
+      if (progress > 0.9 && !tree.classList.contains('tree-bounce')) {
+        tree.classList.add('tree-bounce');
+      } else if (progress <= 0.9) {
+        tree.classList.remove('tree-bounce');
+      }
+    }
+
+    function startTimer(durationMinutes, mode) {
+      clearInterval(timerState.intervalID);
+      timerState.mode = mode;
+      timerState.totalSeconds = durationMinutes * 60;
+      timerState.remainingSeconds = timerState.totalSeconds;
+      timerState.isPaused = false;
+
+      modeLabel.textContent = mode === "focus" ? "Focus Session" : "Break Time";
+      modeLabel.className = `text-xl md:text-2xl font-bold mb-4 mt-6 text-center ${mode === 'focus' ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'}`;
+
+      timerRing.classList.remove('stroke-green-500', 'stroke-blue-500');
+      timerRing.classList.add(mode === 'focus' ? 'stroke-green-500' : 'stroke-blue-500');
+
+      startButton.classList.add('hidden');
+      resetButton.classList.remove('hidden');
+      pauseButton.classList.remove('hidden');
+      pauseButton.textContent = 'Pause';
+      pauseIcon.classList.add('hidden');
+      tree.classList.remove('hidden');
+
+      if (mode === "break") {
+        skipBreakButton.classList.remove('hidden');
+        playBreakMusic();
+      } else {
+        skipBreakButton.classList.add('hidden');
+        stopBreakMusic();
+      }
+
+      updateTimerDisplay(timerState.remainingSeconds, timerState.totalSeconds);
+
+      timerState.intervalID = setInterval(() => {
+        timerState.remainingSeconds--;
+        if (timerState.remainingSeconds < 0) {
+          handleSessionEnd();
+          return;
+        }
+        updateTimerDisplay(timerState.remainingSeconds, timerState.totalSeconds);
+        animateTree(timerState.totalSeconds, timerState.remainingSeconds);
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      timerState.isPaused = true;
+      clearInterval(timerState.intervalID);
+      pauseButton.textContent = 'Resume';
+      pauseIcon.classList.remove('hidden');
+      tree.classList.add('hidden');
+      document.title = "Paused - Pomodoro";
+    }
+
+    function resumeTimer() {
+      timerState.isPaused = false;
+      pauseButton.textContent = 'Pause';
+      pauseIcon.classList.add('hidden');
+      tree.classList.remove('hidden');
+
+      timerState.intervalID = setInterval(() => {
+        timerState.remainingSeconds--;
+        if (timerState.remainingSeconds < 0) {
+          handleSessionEnd();
+          return;
+        }
+        updateTimerDisplay(timerState.remainingSeconds, timerState.totalSeconds);
+        animateTree(timerState.totalSeconds, timerState.remainingSeconds);
+      }, 1000);
+    }
+
+    function resetTimer() {
+      clearInterval(timerState.intervalID);
+      timerState.isPaused = false;
+      timerState.intervalID = null;
+
+      timerState.mode = "focus";
+      const defaultTime = parseInt(focusSelect.value);
+
+      updateTimerDisplay(defaultTime * 60, defaultTime * 60);
+      timerRing.style.strokeDashoffset = 283;
+      tree.style.setProperty('--scale', 1);
+      tree.style.transform = 'scale(1)';
+      tree.classList.remove('tree-bounce', 'hidden');
+      pauseIcon.classList.add('hidden');
+
+      startButton.classList.remove('hidden');
+      pauseButton.classList.add('hidden');
+      resetButton.classList.add('hidden');
+      skipBreakButton.classList.add('hidden');
+
+      modeLabel.textContent = "Focus Session";
+      modeLabel.className = "text-xl md:text-2xl font-bold mb-4 mt-6 text-center text-green-600 dark:text-green-400";
+      timerRing.classList.remove('stroke-blue-500');
+      timerRing.classList.add('stroke-green-500');
+      stopBreakMusic();
+      document.title = "Pomodoro Focus App";
+    }
+
+    function handleSessionEnd() {
+      clearInterval(timerState.intervalID);
+      endSound.play().catch(e => console.log("Audio needed user interaction:", e));
+
+      if (timerState.mode === "focus") {
+        const completedTime = parseInt(focusSelect.value);
+        logSession(completedTime);
+        showSnackbar("Focus session complete!", "success");
+        startTimer(parseInt(breakSelect.value), "break");
+      } else {
+        showSnackbar("Break over! Ready to focus?", "info");
+        resetTimer();
+      }
+    }
+
+    // Music Utils
+    function getEmbedUrl(url) {
+      if (!url) return null;
+      const origin = window.location.origin;
+      const videoRegex = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+      const listRegex = /[?&]list=([^#\&\?]+)/;
+      const videoMatch = url.match(videoRegex);
+      const listMatch = url.match(listRegex);
+      const videoId = (videoMatch && videoMatch[2].length === 11) ? videoMatch[2] : null;
+      const listId = listMatch ? listMatch[1] : null;
+
+      if (videoId && listId) return `https://www.youtube.com/embed/${videoId}?list=${listId}&autoplay=1&enablejsapi=1&origin=${origin}`;
+      else if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&origin=${origin}`;
+      else if (listId) return `https://www.youtube.com/embed?listType=playlist&list=${listId}&autoplay=1&enablejsapi=1&origin=${origin}`;
+      return null;
+    }
+
+    function playBreakMusic() {
+      if (document.getElementById('musicToggle').checked === false || !youtubePlayer) return;
+      musicPlayerContainer.classList.remove('translate-y-[150%]');
+      const storedUrl = getSetting('customMusicUrl');
+      const origin = window.location.origin;
+      let embedUrl = `https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1&enablejsapi=1&origin=${origin}`;
+      if (storedUrl) {
+        const calculatedUrl = getEmbedUrl(storedUrl);
+        if (calculatedUrl) embedUrl = calculatedUrl;
+      }
+      youtubePlayer.src = embedUrl;
+    }
+
+    function stopBreakMusic() {
+      if (!youtubePlayer) return;
+      musicPlayerContainer.classList.add('translate-y-[150%]');
+      youtubePlayer.src = "";
+    }
+
+    // Listeners
+    startButton.addEventListener('click', () => startTimer(parseInt(focusSelect.value), "focus"));
+    pauseButton.addEventListener('click', () => { if (timerState.isPaused) resumeTimer(); else pauseTimer(); });
+    resetButton.addEventListener('click', resetTimer);
+    skipBreakButton.addEventListener('click', () => { stopBreakMusic(); resetTimer(); });
+    focusSelect.addEventListener('change', () => { if (!timerState.intervalID) updateTimerDisplay(focusSelect.value * 60, focusSelect.value * 60); });
+
+    document.getElementById('urlForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const url = document.getElementById('videoUrl').value;
+      const embedUrl = getEmbedUrl(url);
+      if (embedUrl) {
+        setSetting('customMusicUrl', url);
+        showSnackbar("Break music URL saved!", "success");
+        document.getElementById('videoUrl').value = "";
+      } else showSnackbar("Invalid YouTube URL", "error");
+    });
+
+    document.getElementById('musicToggle').addEventListener('change', (e) => {
+      const isEnabled = e.target.checked;
+      setSetting('music_enabled', isEnabled.toString());
+      document.getElementById('urlFormContainer').classList.toggle('hidden', !isEnabled);
+    });
+
+    if (closeMusicPlayerBtn) closeMusicPlayerBtn.addEventListener('click', stopBreakMusic);
+
+    document.getElementById('themeSelect').addEventListener('change', () => {
+      const theme = document.getElementById('themeSelect').value;
+      setSetting('theme', theme);
+      document.documentElement.className = theme === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : '') : theme;
+    });
+
+    function showSnackbar(message, type = "info") {
+      const snackbar = document.getElementById('snackbar');
+      if (!snackbar) return;
+      snackbar.textContent = message;
+      snackbar.className = `fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 transition-opacity duration-300 ${type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-gray-800'} text-white opacity-100 text-sm w-max max-w-[90vw] text-center`;
+      setTimeout(() => {
+        snackbar.classList.remove('opacity-100');
+        snackbar.classList.add('opacity-0');
+      }, 3000);
+    }
+
+    // Init
+    window.addEventListener('DOMContentLoaded', () => {
+      initDB();
+      updateTimerDisplay(focusSelect.value * 60, focusSelect.value * 60);
+    });
+  </script>
+</body>
+
 </html>
