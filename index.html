@@ -547,20 +547,7 @@
         
         // const firebaseConfigRaw = "FIREBASE_CONFIG_PLACEHOLDER"; 
         
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : (typeof firebaseConfigRaw === 'object' ? firebaseConfigRaw : {
-                // FALLBACK: If you are running locally without the injection script,
-                // you must manually set your keys here or use the __firebase_config env var.
-                // We do not commit secrets to the repo.
-                // apiKey: "",
-                // authDomain: "",
-                // projectId: "",
-                // storageBucket: "",
-                // messagingSenderId: "",
-                // appId: "",
-                // measurementId: ""
-            });
+        // const firebaseConfig = JSON.parse(__firebase_config) 
 
         let app, auth, db, provider;
 
