@@ -61,10 +61,10 @@
         border: 4px solid #1f2937; /* dark-gray-800 */
         border-radius: 1rem;
         overflow: hidden;
-        height: 100%;
+        width: 100%;
         background: #000;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        aspect-ratio: 16/9;
+        transition: all 0.3s ease; /* Smooth transition for resizing */
       }
       
       /* Custom scrollbar */
@@ -189,7 +189,7 @@
              </div>
           </div>
 
-          <!-- Calendar Button (New) -->
+          <!-- Calendar Button -->
           <button id="openCalendar" class="flex items-center gap-2 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               <i data-lucide="calendar" class="w-4 h-4 text-blue-500"></i>
               <span class="text-xs sm:text-sm font-medium hidden sm:inline">Calendar</span>
@@ -355,21 +355,28 @@
                 </div>
             </div>
 
-            <!-- Focus Music (Lofi) Container -->
+            <!-- Focus Music Container -->
             <div class="p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl flex flex-col">
-              <h2 class="text-lg sm:text-xl font-bold mb-4 text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                <i data-lucide="headphones" class="w-5 h-5"></i> Focus Ambience
-              </h2>
-              <div class="media-container flex-1 w-full">
+              <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg sm:text-xl font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                  <i data-lucide="headphones" class="w-5 h-5"></i> Focus Ambience
+                </h2>
+                <button id="openFocusSettings" class="text-gray-500 hover:text-green-600 dark:hover:text-green-400 transition-colors" title="Change Music">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                </button>
+              </div>
+              <div id="focusMediaContainer" class="media-container flex-1 w-full relative">
+                <!-- Content injected by JS -->
                 <iframe 
+                  id="focusPlayer"
                   src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=0" 
-                  title="Lofi Girl Radio"
+                  title="Focus Music"
                   width="100%" 
                   height="100%" 
                   frameborder="0" 
                   allow="autoplay; encrypted-media; picture-in-picture" 
                   allowfullscreen
-                  class="w-full h-full object-cover">
+                  class="w-full h-full object-cover absolute inset-0">
                 </iframe>
               </div>
             </div>
@@ -425,7 +432,45 @@
           </div>
       </div>
 
-      <!-- Calendar Dashboard Modal (New) -->
+      <!-- Focus Music Settings Modal -->
+      <div id="focusSettingsModal" class="fixed inset-0 z-[60] hidden flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-full max-w-md border border-gray-200 dark:border-gray-700 transform transition-all scale-100">
+              <div class="flex justify-between items-center mb-4">
+                  <h3 class="text-lg font-bold flex items-center gap-2">
+                      <i data-lucide="headphones" class="w-5 h-5"></i> Focus Music Settings
+                  </h3>
+                  <button id="closeFocusSettings" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                      <i data-lucide="x" class="w-5 h-5"></i>
+                  </button>
+              </div>
+              <form id="focusMusicForm" class="flex flex-col gap-4">
+                  <div>
+                      <label class="block text-sm font-medium mb-2 text-gray-600 dark:text-gray-400">Source</label>
+                      <div class="flex gap-4">
+                          <label class="flex items-center gap-2 cursor-pointer p-2 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition w-1/2">
+                              <input type="radio" name="focusSource" value="youtube" checked class="text-green-500 focus:ring-green-500">
+                              <span class="text-sm font-medium">YouTube</span>
+                          </label>
+                          <label class="flex items-center gap-2 cursor-pointer p-2 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition w-1/2">
+                              <input type="radio" name="focusSource" value="spotify" class="text-green-500 focus:ring-green-500">
+                              <span class="text-sm font-medium">Spotify</span>
+                          </label>
+                      </div>
+                  </div>
+                  <div>
+                      <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">URL</label>
+                      <input type="text" id="focusVideoUrl" placeholder="Paste URL here..." 
+                             class="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900 focus:ring-2 focus:ring-green-500 outline-none" />
+                      <p class="text-xs text-gray-500 mt-1" id="focusUrlHelp">YouTube Video or Playlist link.</p>
+                  </div>
+                  <button id="saveFocusMusicBtn" type="submit" class="w-full px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors">
+                    Save & Play
+                  </button>
+              </form>
+          </div>
+      </div>
+
+      <!-- Calendar Dashboard Modal -->
       <div id="calendarModal" class="fixed inset-0 z-[70] hidden flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
@@ -443,7 +488,7 @@
           </div>
       </div>
 
-      <!-- Break Music Player (Bottom Sheet on Mobile, Floating on Desktop) -->
+      <!-- Break Music Player -->
       <div id="musicPlayer" class="fixed bottom-0 right-0 left-0 md:left-auto md:bottom-4 md:right-4 z-50 transition-transform duration-300 translate-y-[150%] shadow-2xl md:rounded-lg rounded-t-xl overflow-hidden border-t-2 md:border-2 border-blue-500 w-full md:w-80 bg-black h-auto">
         <div class="bg-blue-600 text-white px-4 py-2 text-sm flex justify-between items-center">
           <span class="font-bold flex items-center gap-2">🎵 Break Time Music</span>
@@ -592,15 +637,31 @@
                     if(cachedSettings.music_enabled !== undefined) {
                         const enabled = cachedSettings.music_enabled === 'true';
                         document.getElementById('musicToggle').checked = enabled;
-                        // Don't auto-show modal on load, just set state
                     }
-                    // Pre-fill Music URL if exists
+                    // Pre-fill Break Music URL if exists
                     if(cachedSettings.custom_music_url) {
                         document.getElementById('videoUrl').value = cachedSettings.custom_music_url;
                     }
+                    
+                    // Initialize Focus Music
+                    const type = cachedSettings.focus_music_type || 'youtube';
+                    const url = cachedSettings.focus_music_url;
+                    updateFocusMusicPlayer(type, url);
+                    
+                    // Pre-fill Focus Settings Form
+                    const rbs = document.querySelectorAll('input[name="focusSource"]');
+                    for(const rb of rbs) {
+                        if(rb.value === type) rb.checked = true;
+                    }
+                    if(url) document.getElementById('focusVideoUrl').value = url;
+                    
+                } else {
+                    // Initialize default focus music if no settings exist
+                    updateFocusMusicPlayer('youtube', null);
                 }
             } catch (e) {
                 console.error("Error loading settings", e);
+                updateFocusMusicPlayer('youtube', null); // Fallback
             }
         }
 
@@ -611,6 +672,62 @@
                 await setDoc(doc(getSettingsRef(), 'config'), cachedSettings, { merge: true });
             } catch(e) {
                 console.error("Save setting failed", e);
+            }
+        }
+
+        function updateFocusMusicPlayer(type, url) {
+            const container = document.getElementById('focusMediaContainer');
+            const player = document.getElementById('focusPlayer');
+            let src = "";
+
+            if (type === 'spotify') {
+                const defaultSpotify = "https://open.spotify.com/embed/playlist/5acGzAC0OH4QDVj5hlFqlK?utm_source=generator";
+                
+                if (url) {
+                    if (url.includes('open.spotify.com/embed')) {
+                        src = url;
+                    } else if (url.includes('open.spotify.com')) {
+                        src = url.replace('open.spotify.com/', 'open.spotify.com/embed/');
+                    } else {
+                        src = defaultSpotify; 
+                    }
+                } else {
+                    src = defaultSpotify;
+                }
+                
+                // Spotify styles: Needs fixed height, remove absolute positioning
+                container.style.aspectRatio = "auto";
+                container.style.height = "auto"; // Let content dictate height
+                container.classList.remove('absolute', 'inset-0'); // Safety removal if added to container
+                
+                player.style.height = "352px"; 
+                player.style.position = "relative"; // Reset position
+                player.classList.remove('absolute', 'inset-0', 'h-full'); // Remove Tailwind absolute classes
+                
+                player.src = src;
+                player.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
+                
+            } else {
+                // Default YouTube (Lofi Girl)
+                const defaultYT = `https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=0`;
+                
+                if (url) {
+                    const embedUrl = getEmbedUrl(url); 
+                    src = embedUrl ? embedUrl : defaultYT;
+                } else {
+                    src = defaultYT;
+                }
+                
+                // YouTube styles: Needs 16:9 Aspect Ratio and Absolute positioning
+                container.style.aspectRatio = "16/9";
+                container.style.height = "auto"; 
+                
+                player.style.height = "100%";
+                player.style.position = ""; // Reset inline style
+                player.classList.add('absolute', 'inset-0', 'h-full'); // Add back Tailwind classes
+                
+                player.src = src;
+                player.allow = "autoplay; encrypted-media; picture-in-picture";
             }
         }
 
@@ -731,7 +848,7 @@
             } catch (error) {
                 console.error("Error saving task:", error);
                 showSnackbar("Failed to save task", "error");
-                // Restore button on error
+            } finally {
                 saveBtn.disabled = false;
                 saveBtn.textContent = originalText;
             }
@@ -776,7 +893,6 @@
             if(activeTask) {
                 document.getElementById('currentTaskDisplay').classList.remove('hidden');
                 document.getElementById('currentTaskTitle').textContent = activeTask.title;
-                // Save active task to local storage for persistence
                 localStorage.setItem('activeTaskTitle', activeTask.title);
             } else {
                 document.getElementById('currentTaskDisplay').classList.add('hidden');
@@ -839,7 +955,7 @@
                                 <button class="text-gray-400 hover:text-yellow-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); editTask('${task.id}')" title="Edit Task">
                                     <i data-lucide="pencil" class="w-4 h-4"></i>
                                 </button>
-                                <button class="text-gray-400 hover:text-red-500 transition-opacity p-1" onclick="event.stopPropagation(); deleteTask('${task.id}')" title="Delete Task">
+                                <button class="text-gray-400 hover:text-red-500 transition-opacity p-1" onclick="event.stopPropagation(); deleteTask('${task.id}', this)" title="Delete Task">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
                             </div>
@@ -871,6 +987,8 @@
             const input = document.getElementById(`subtask-input-${taskId}`);
             const title = input.value;
             if(!title) return;
+            
+            // <-- WRITE to Firestore
             await addDoc(getSubtasksRef(), {
                 parent_task_id: taskId,
                 title: title,
@@ -881,12 +999,14 @@
         };
 
         window.deleteSubtask = async (subId) => {
+            // <-- WRITE to Firestore
             await deleteDoc(doc(getSubtasksRef(), subId));
             renderTasks();
         };
 
         window.toggleSubtaskComplete = async (subId, currentStatus) => {
             const newStatus = currentStatus ? 0 : 1;
+            // <-- WRITE to Firestore
             await updateDoc(doc(getSubtasksRef(), subId), { is_completed: newStatus });
             renderTasks();
         };
@@ -894,12 +1014,15 @@
         window.setActiveTask = async (id) => {
             const snapshot = await getDocs(getTasksRef());
             const batchPromises = [];
+            
             snapshot.forEach(d => {
                 if(d.data().is_active === 1) {
                     batchPromises.push(updateDoc(doc(getTasksRef(), d.id), { is_active: 0 }));
                 }
             });
             await Promise.all(batchPromises);
+            
+            // <-- WRITE to Firestore
             await updateDoc(doc(getTasksRef(), id), { is_active: 1 });
             renderTasks();
         };
@@ -907,6 +1030,7 @@
         window.toggleTaskComplete = async (id, currentStatus) => {
             const newStatus = currentStatus ? 0 : 1;
             const completedAt = newStatus === 1 ? Date.now() : null;
+            // <-- WRITE to Firestore
             await updateDoc(doc(getTasksRef(), id), {
                 is_completed: newStatus,
                 is_active: 0,
@@ -915,18 +1039,35 @@
             renderTasks();
         };
 
-        window.deleteTask = async (id) => {
+        window.deleteTask = async (id, btn) => {
             if(confirm("Delete this task and all its subtasks?")) {
-                await deleteDoc(doc(getTasksRef(), id));
-                const subSnap = await getDocs(getSubtasksRef()); 
-                const subDeletes = [];
-                subSnap.forEach(d => {
-                    if(d.data().parent_task_id === id) {
-                        subDeletes.push(deleteDoc(doc(getSubtasksRef(), d.id)));
-                    }
-                });
-                await Promise.all(subDeletes);
-                renderTasks();
+                
+                // Show Loading Spinner
+                const originalContent = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-red-500"></i>`;
+                lucide.createIcons();
+
+                try {
+                    // <-- WRITE to Firestore
+                    await deleteDoc(doc(getTasksRef(), id));
+                    const subSnap = await getDocs(getSubtasksRef()); 
+                    const subDeletes = [];
+                    subSnap.forEach(d => {
+                        if(d.data().parent_task_id === id) {
+                            subDeletes.push(deleteDoc(doc(getSubtasksRef(), d.id)));
+                        }
+                    });
+                    await Promise.all(subDeletes);
+                    renderTasks();
+                } catch (error) {
+                    console.error("Error deleting task:", error);
+                    showSnackbar("Failed to delete task", "error");
+                    // Restore button state on error
+                    btn.innerHTML = originalContent;
+                    btn.disabled = false;
+                    lucide.createIcons();
+                }
             }
         }
 
@@ -1266,9 +1407,6 @@
                 if (proceed) {
                     try {
                         await window.loginWithGoogle();
-                        // If logic succeeds, auth listener fires. 
-                        // We return here to let user click start again or we could auto start.
-                        // Better to just let them orient themselves.
                         return;
                     } catch(e) {
                         console.log("Login canceled or failed");
@@ -1304,7 +1442,7 @@
             while (currentDate <= today) {
                 const dateStr = currentDate.toISOString().slice(0, 10);
                 const mins = dataMap[dateStr] || 0;
-                let colorClass = 'bg-gray-200 dark:bg-gray-700'; // Fixed for Dark Mode visibility
+                let colorClass = 'bg-gray-200 dark:bg-gray-700';
                 if (mins > 0) colorClass = 'bg-green-200 dark:bg-green-900';
                 if (mins > 30) colorClass = 'bg-green-300 dark:bg-green-800';
                 if (mins > 60) colorClass = 'bg-green-400 dark:bg-green-700';
@@ -1360,19 +1498,6 @@
             youtubePlayer.src = "";
         }
 
-        // Calendar Modal Logic
-        const calendarModal = document.getElementById('calendarModal');
-        const openCalendarBtn = document.getElementById('openCalendar');
-        const closeCalendarBtn = document.getElementById('closeCalendar');
-
-        openCalendarBtn.addEventListener('click', () => {
-            calendarModal.classList.remove('hidden');
-        });
-
-        closeCalendarBtn.addEventListener('click', () => {
-            calendarModal.classList.add('hidden');
-        });
-
         // Break Music Settings Modal Logic
         const musicSettingsModal = document.getElementById('musicSettingsModal');
         const openMusicSettingsBtn = document.getElementById('openMusicSettings');
@@ -1409,6 +1534,85 @@
             }
         });
 
+        // Focus Music Settings Logic
+        const focusSettingsModal = document.getElementById('focusSettingsModal');
+        const openFocusSettingsBtn = document.getElementById('openFocusSettings');
+        const closeFocusSettingsBtn = document.getElementById('closeFocusSettings');
+        const focusMusicForm = document.getElementById('focusMusicForm');
+        const focusSourceRadios = document.querySelectorAll('input[name="focusSource"]');
+        const focusUrlHelp = document.getElementById('focusUrlHelp');
+
+        openFocusSettingsBtn.addEventListener('click', () => {
+            focusSettingsModal.classList.remove('hidden');
+        });
+
+        closeFocusSettingsBtn.addEventListener('click', () => {
+            focusSettingsModal.classList.add('hidden');
+        });
+
+        focusSourceRadios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                if(e.target.value === 'spotify') {
+                    focusUrlHelp.textContent = 'Spotify: Song, Album, or Playlist link.';
+                    document.getElementById('focusVideoUrl').placeholder = "https://open.spotify.com/playlist/..."
+                } else {
+                    focusUrlHelp.textContent = 'YouTube: Video or Playlist link.';
+                    document.getElementById('focusVideoUrl').placeholder = "https://youtube.com/watch?v=..."
+                }
+            });
+        });
+
+        focusMusicForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const type = document.querySelector('input[name="focusSource"]:checked').value;
+            const url = document.getElementById('focusVideoUrl').value;
+            const saveBtn = document.getElementById('saveFocusMusicBtn');
+            
+            // Loading State
+            const originalText = saveBtn.textContent;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = `<div class="flex items-center justify-center gap-2"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Saving...</div>`;
+            lucide.createIcons();
+
+            try {
+                // Save to Firestore
+                if(userId) {
+                    // Update cache first so UI feels responsive
+                    cachedSettings['focus_music_type'] = type;
+                    cachedSettings['focus_music_url'] = url;
+                    
+                    // Write to DB
+                    await setDoc(doc(getSettingsRef(), 'config'), cachedSettings, { merge: true });
+                    showSnackbar("Focus ambience saved to cloud!", "success");
+                } else {
+                    showSnackbar("Saved locally (Sign in to sync)", "info");
+                }
+                
+                // Update UI
+                updateFocusMusicPlayer(type, url);
+                focusSettingsModal.classList.add('hidden');
+            } catch(err) {
+                console.error("Failed to save focus settings", err);
+                showSnackbar("Failed to save settings: " + err.message, "error");
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = originalText;
+            }
+        });
+
+        // Calendar Modal Logic
+        const calendarModal = document.getElementById('calendarModal');
+        const openCalendarBtn = document.getElementById('openCalendar');
+        const closeCalendarBtn = document.getElementById('closeCalendar');
+
+        openCalendarBtn.addEventListener('click', () => {
+            calendarModal.classList.remove('hidden');
+        });
+
+        closeCalendarBtn.addEventListener('click', () => {
+            calendarModal.classList.add('hidden');
+        });
+
         if(closeMusicPlayerBtn) closeMusicPlayerBtn.addEventListener('click', stopBreakMusic);
 
         document.getElementById('themeSelect').addEventListener('change', () => {
@@ -1425,7 +1629,7 @@
             const snackbar = document.getElementById('snackbar');
             if (!snackbar) return;
             snackbar.textContent = message;
-            snackbar.className = `fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 transition-opacity duration-300 ${type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-gray-800'} text-white opacity-100 text-sm w-max max-w-[90vw] text-center`;
+            snackbar.className = `fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-[80] transition-opacity duration-300 ${type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-gray-800'} text-white opacity-100 text-sm w-max max-w-[90vw] text-center`;
             setTimeout(() => {
                 snackbar.classList.remove('opacity-100');
                 snackbar.classList.add('opacity-0');
