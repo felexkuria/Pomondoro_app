@@ -1378,6 +1378,7 @@
                         }
                     });
 
+                    // <-- WRITE to Firestore
                     await addDoc(getSessionsRef(), {
                         date: new Date().toISOString().slice(0, 10),
                         duration: completedTime,
@@ -1442,7 +1443,7 @@
             while (currentDate <= today) {
                 const dateStr = currentDate.toISOString().slice(0, 10);
                 const mins = dataMap[dateStr] || 0;
-                let colorClass = 'bg-gray-200 dark:bg-gray-700';
+                let colorClass = 'bg-gray-200 dark:bg-gray-700'; // Fixed for Dark Mode visibility
                 if (mins > 0) colorClass = 'bg-green-200 dark:bg-green-900';
                 if (mins > 30) colorClass = 'bg-green-300 dark:bg-green-800';
                 if (mins > 60) colorClass = 'bg-green-400 dark:bg-green-700';
