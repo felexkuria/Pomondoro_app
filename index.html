@@ -1503,7 +1503,7 @@
                 
                 const tooltip = document.createElement('div');
                 tooltip.className = 'absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none hidden sm:block';
-                tooltip.innerHTML = `<strong>${mins}m</strong> on ${new Date(dateStr).toLocaleDateString(undefined, {month:'short', day:'numeric'})}`;
+                tooltip.innerHTML = `<strong>${formatMinutes(mins)}</strong> on ${new Date(dateStr).toLocaleDateString(undefined, {month:'short', day:'numeric'})}`;
                 
                 cell.appendChild(tooltip);
                 graphEl.appendChild(cell);
