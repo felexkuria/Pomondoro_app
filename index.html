@@ -543,9 +543,9 @@
         
         // --- NOTE FOR DEPLOYMENT ---
         // When deploying to GitHub Pages or production, REPLACE the line below:
-        // const firebaseConfig = JSON.parse(__firebase_config);
+         const firebaseConfig = JSON.parse(__firebase_config);
         
-        const firebaseConfigRaw = "FIREBASE_CONFIG_PLACEHOLDER"; 
+        // const firebaseConfigRaw = "FIREBASE_CONFIG_PLACEHOLDER"; 
         
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
             ? JSON.parse(__firebase_config) 
