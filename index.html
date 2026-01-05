@@ -65,6 +65,7 @@
         background: #000;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         transition: all 0.3s ease; /* Smooth transition for resizing */
+        min-height: 300px; /* Fallback height for TVs/Browsers that don't support aspect-ratio */
       }
       
       /* Custom scrollbar */
@@ -540,16 +541,46 @@
 
         // -------------------- Firebase Integration --------------------
         
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : "FIREBASE_CONFIG_PLACEHOLDER";
+        // --- NOTE FOR DEPLOYMENT ---
+        // When deploying to GitHub Pages or production, REPLACE the line below:
+        // const firebaseConfig = JSON.parse(__firebase_config);
+        
+        const firebaseConfigRaw = "FIREBASE_CONFIG_PLACEHOLDER"; 
+        
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : (typeof firebaseConfigRaw === 'object' ? firebaseConfigRaw : {
+                // FALLBACK: If you are running locally without the injection script,
+                // you must manually set your keys here or use the __firebase_config env var.
+                // We do not commit secrets to the repo.
+                apiKey: "",
+                authDomain: "",
+                projectId: "",
+                storageBucket: "",
+                messagingSenderId: "",
+                appId: "",
+                measurementId: ""
+            });
 
-        const configToUse = typeof firebaseConfig === 'string' && firebaseConfig !== "FIREBASE_CONFIG_PLACEHOLDER" 
-                            ? JSON.parse(firebaseConfig) 
-                            : (typeof firebaseConfig === 'object' ? firebaseConfig : {});
+        let app, auth, db, provider;
 
-        const app = initializeApp(configToUse);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const provider = new GoogleAuthProvider();
+        try {
+            if (firebaseConfig.apiKey) {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                provider = new GoogleAuthProvider();
+            } else {
+                console.warn("Firebase config is missing. App is running in offline mode.");
+                document.getElementById('dbStatus').textContent = "Offline Mode (Config Missing)";
+                document.getElementById('dbStatus').classList.add("text-yellow-500");
+            }
+        } catch(e) {
+            console.error("Firebase Init Error:", e);
+            document.getElementById('dbStatus').textContent = "Connection Error (Check Console)";
+            document.getElementById('dbStatus').classList.add("text-red-500");
+        }
+
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         
         let userId = null;
@@ -564,51 +595,50 @@
             // Fallback handled by onAuthStateChanged
           }
         };
-        // Trigger init check
-        onAuthStateChanged(auth, async (user) => {
-            const loginBtn = document.getElementById('googleLoginBtn');
-            const userProfile = document.getElementById('userProfile');
-            const userAvatar = document.getElementById('userAvatar');
+        
+        if (auth) {
+            onAuthStateChanged(auth, async (user) => {
+                const loginBtn = document.getElementById('googleLoginBtn');
+                const userProfile = document.getElementById('userProfile');
+                const userAvatar = document.getElementById('userAvatar');
 
-            if (user) {
-                // --- USER IS LOGGED IN ---
-                userId = user.uid;
+                if (user) {
+                    // --- USER IS LOGGED IN ---
+                    userId = user.uid;
 
-                if (!user.isAnonymous) {
-                    loginBtn.classList.add('hidden');
-                    userProfile.classList.remove('hidden');
-                    userAvatar.src = user.photoURL || 'https://via.placeholder.com/32';
-                    showSnackbar(`Welcome, ${user.displayName ? user.displayName.split(' ')[0] : 'User'}!`, "success");
+                    if (!user.isAnonymous) {
+                        loginBtn.classList.add('hidden');
+                        userProfile.classList.remove('hidden');
+                        userAvatar.src = user.photoURL || 'https://via.placeholder.com/32';
+                        showSnackbar(`Welcome, ${user.displayName ? user.displayName.split(' ')[0] : 'User'}!`, "success");
+                    } else {
+                        loginBtn.classList.remove('hidden');
+                        userProfile.classList.add('hidden');
+                    }
+
+                    document.getElementById('dbStatus').style.opacity = '1';
+                    setTimeout(() => document.getElementById('dbStatus').style.opacity = '0', 5000);
+                    await loadSettings();
+                    loadFromFirestore();
+                    restoreLocalState();
                 } else {
+                    // --- USER IS LOGGED OUT (Guest/Default Data) ---
+                    userId = null;
+                    cachedSettings = {}; // Clear settings
+                    
+                    // Show Login Button
                     loginBtn.classList.remove('hidden');
                     userProfile.classList.add('hidden');
+
+                    // Clear Data from UI
+                    document.getElementById('totalFocus').textContent = "0h 0m";
+                    document.getElementById('streakCounter').textContent = "0 🔥";
+                    document.getElementById('githubGraph').innerHTML = '<div class="text-xs text-gray-500 p-2">Sign in to view activity history</div>';
+                    document.getElementById('taskList').innerHTML = '<div class="text-center text-gray-500 py-8 italic text-sm">Sign in with Google to manage your tasks.</div>';
+                    document.getElementById('currentTaskDisplay').classList.add('hidden');
                 }
-
-                document.getElementById('dbStatus').style.opacity = '1';
-                setTimeout(() => document.getElementById('dbStatus').style.opacity = '0', 5000);
-                await loadSettings();
-                loadFromFirestore();
-                restoreLocalState();
-            } else {
-                // --- USER IS LOGGED OUT (Guest/Default Data) ---
-                userId = null;
-                cachedSettings = {}; // Clear settings
-                
-                // Show Login Button
-                loginBtn.classList.remove('hidden');
-                userProfile.classList.add('hidden');
-
-                // Clear Data from UI
-                document.getElementById('totalFocus').textContent = "0h 0m";
-                document.getElementById('streakCounter').textContent = "0 🔥";
-                document.getElementById('githubGraph').innerHTML = '<div class="text-xs text-gray-500 p-2">Sign in to view activity history</div>';
-                document.getElementById('taskList').innerHTML = '<div class="text-center text-gray-500 py-8 italic text-sm">Sign in with Google to manage your tasks.</div>';
-                document.getElementById('currentTaskDisplay').classList.add('hidden');
-                
-                // Reset Theme to default if needed, or leave as last selected
-                // (Optional: resetTimer() here if you want to stop timer on logout)
-            }
-        });
+            });
+        }
 
         // --- Google Login Logic ---
         window.loginWithGoogle = async () => {
@@ -636,7 +666,9 @@
         // -------------------- Firestore Logic --------------------
         
         const getTasksRef = () => collection(db, 'artifacts', appId, 'users', userId, 'tasks');
+        // New: Subtasks are now a sub-collection of a specific task
         const getTaskSubtasksRef = (taskId) => collection(db, 'artifacts', appId, 'users', userId, 'tasks', taskId, 'subtasks');
+        
         const getSessionsRef = () => collection(db, 'artifacts', appId, 'users', userId, 'focus_sessions');
         const getSettingsRef = () => collection(db, 'artifacts', appId, 'users', userId, 'settings');
 
@@ -901,14 +933,17 @@
             const tasksSnap = await getDocs(getTasksRef());
             let tasks = [];
             
+            // 1. Fetch all tasks
             tasksSnap.forEach(doc => tasks.push({id: doc.id, ...doc.data()}));
             
+            // 2. Fetch subtasks for each task (Nested Collection)
             await Promise.all(tasks.map(async (task) => {
                 const subSnap = await getDocs(getTaskSubtasksRef(task.id));
                 task.subtasks = [];
                 subSnap.forEach(subDoc => {
                     task.subtasks.push({id: subDoc.id, ...subDoc.data()});
                 });
+                // Sort subtasks by creation time
                 task.subtasks.sort((a,b) => a.created_at - b.created_at);
             }));
             
@@ -936,10 +971,12 @@
             }
 
             tasks.forEach(task => {
+                // Use the subtasks we fetched earlier
                 const subtasks = task.subtasks || [];
                 const completedSubtasks = subtasks.filter(s => s.is_completed).length;
                 const progressPct = subtasks.length > 0 ? (completedSubtasks / subtasks.length) * 100 : 0;
                 
+                // Calculate time display
                 const totalMinutes = task.total_minutes || 0;
                 const timeDisplay = formatMinutes(totalMinutes);
 
@@ -1027,12 +1064,14 @@
             const title = input.value;
             if(!title) return;
             
+            // Loading UI
             const originalContent = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i>`;
             lucide.createIcons();
 
             try {
+                // <-- WRITE to Firestore Subcollection
                 await addDoc(getTaskSubtasksRef(taskId), {
                     title: title,
                     is_completed: 0,
@@ -1042,18 +1081,21 @@
             } catch (error) {
                 console.error("Error adding subtask:", error);
                 showSnackbar("Failed to add subtask", "error");
+                // Restore button state on error (success state is handled by re-render)
                 btn.disabled = false;
                 btn.innerHTML = originalContent;
             }
         };
 
         window.deleteSubtask = async (subId, taskId) => {
+            // <-- WRITE to Firestore Subcollection
             await deleteDoc(doc(getTaskSubtasksRef(taskId), subId));
             renderTasks();
         };
 
         window.toggleSubtaskComplete = async (subId, currentStatus, taskId) => {
             const newStatus = currentStatus ? 0 : 1;
+            // <-- WRITE to Firestore Subcollection
             await updateDoc(doc(getTaskSubtasksRef(taskId), subId), { is_completed: newStatus });
             renderTasks();
         };
@@ -1074,6 +1116,7 @@
         window.toggleTaskComplete = async (id, currentStatus) => {
             const newStatus = currentStatus ? 0 : 1;
             const completedAt = newStatus === 1 ? Date.now() : null;
+            // <-- WRITE to Firestore
             await updateDoc(doc(getTasksRef(), id), {
                 is_completed: newStatus,
                 is_active: 0,
@@ -1085,12 +1128,14 @@
         window.deleteTask = async (id, btn) => {
             if(confirm("Delete this task and all its subtasks?")) {
                 
+                // Show Loading Spinner
                 const originalContent = btn.innerHTML;
                 btn.disabled = true;
                 btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-red-500"></i>`;
                 lucide.createIcons();
 
                 try {
+                    // 1. Delete all subtasks first (Manual Cascade)
                     const subRef = getTaskSubtasksRef(id);
                     const subSnap = await getDocs(subRef);
                     const batchPromises = [];
@@ -1099,12 +1144,14 @@
                     });
                     await Promise.all(batchPromises);
 
+                    // 2. Delete parent task
                     await deleteDoc(doc(getTasksRef(), id));
                     
                     renderTasks();
                 } catch (error) {
                     console.error("Error deleting task:", error);
                     showSnackbar("Failed to delete task", "error");
+                    // Restore button state on error
                     btn.innerHTML = originalContent;
                     btn.disabled = false;
                     lucide.createIcons();
@@ -1242,6 +1289,7 @@
                         // Timer finished while closed
                         timerState.remainingSeconds = 0;
                         updateTimerDisplay(0, saved.totalSeconds);
+                        // We could auto-complete here, but might be jarring. Just reset.
                         window.resetTimer();
                         return;
                     }
@@ -1321,7 +1369,7 @@
                 const now = Date.now();
                 const secondsLeft = Math.ceil((timerState.endTime - now) / 1000);
                 timerState.remainingSeconds = secondsLeft;
-                saveLocalState(); 
+                saveLocalState(); // Persist every second
 
                 if (timerState.remainingSeconds <= 0) {
                     timerState.remainingSeconds = 0;
