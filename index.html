@@ -619,9 +619,7 @@
         // -------------------- Firestore Logic --------------------
         
         const getTasksRef = () => collection(db, 'artifacts', appId, 'users', userId, 'tasks');
-        // New: Subtasks are now a sub-collection of a specific task
         const getTaskSubtasksRef = (taskId) => collection(db, 'artifacts', appId, 'users', userId, 'tasks', taskId, 'subtasks');
-        
         const getSessionsRef = () => collection(db, 'artifacts', appId, 'users', userId, 'focus_sessions');
         const getSettingsRef = () => collection(db, 'artifacts', appId, 'users', userId, 'settings');
 
@@ -640,17 +638,14 @@
                         const enabled = cachedSettings.music_enabled === 'true';
                         document.getElementById('musicToggle').checked = enabled;
                     }
-                    // Pre-fill Break Music URL if exists
                     if(cachedSettings.custom_music_url) {
                         document.getElementById('videoUrl').value = cachedSettings.custom_music_url;
                     }
                     
-                    // Initialize Focus Music
                     const type = cachedSettings.focus_music_type || 'youtube';
                     const url = cachedSettings.focus_music_url;
                     updateFocusMusicPlayer(type, url);
                     
-                    // Pre-fill Focus Settings Form
                     const rbs = document.querySelectorAll('input[name="focusSource"]');
                     for(const rb of rbs) {
                         if(rb.value === type) rb.checked = true;
@@ -658,12 +653,11 @@
                     if(url) document.getElementById('focusVideoUrl').value = url;
                     
                 } else {
-                    // Initialize default focus music if no settings exist
                     updateFocusMusicPlayer('youtube', null);
                 }
             } catch (e) {
                 console.error("Error loading settings", e);
-                updateFocusMusicPlayer('youtube', null); // Fallback
+                updateFocusMusicPlayer('youtube', null); 
             }
         }
 
@@ -697,20 +691,18 @@
                     src = defaultSpotify;
                 }
                 
-                // Spotify styles: Needs fixed height, remove absolute positioning
                 container.style.aspectRatio = "auto";
-                container.style.height = "auto"; // Let content dictate height
-                container.classList.remove('absolute', 'inset-0'); // Safety removal if added to container
+                container.style.height = "auto"; 
+                container.classList.remove('absolute', 'inset-0'); 
                 
                 player.style.height = "352px"; 
-                player.style.position = "relative"; // Reset position
-                player.classList.remove('absolute', 'inset-0', 'h-full'); // Remove Tailwind absolute classes
+                player.style.position = "relative"; 
+                player.classList.remove('absolute', 'inset-0', 'h-full'); 
                 
                 player.src = src;
                 player.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
                 
             } else {
-                // Default YouTube (Lofi Girl)
                 const defaultYT = `https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=0`;
                 
                 if (url) {
@@ -720,13 +712,12 @@
                     src = defaultYT;
                 }
                 
-                // YouTube styles: Needs 16:9 Aspect Ratio and Absolute positioning
                 container.style.aspectRatio = "16/9";
                 container.style.height = "auto"; 
                 
                 player.style.height = "100%";
-                player.style.position = ""; // Reset inline style
-                player.classList.add('absolute', 'inset-0', 'h-full'); // Add back Tailwind classes
+                player.style.position = ""; 
+                player.classList.add('absolute', 'inset-0', 'h-full'); 
                 
                 player.src = src;
                 player.allow = "autoplay; encrypted-media; picture-in-picture";
@@ -736,7 +727,6 @@
         async function loadFromFirestore() {
             if(!userId) return;
             
-            // 1. Fetch Sessions for Stats (Full History)
             const sessionsSnap = await getDocs(getSessionsRef());
             let totalMins = 0;
             const sessionData = [];
@@ -749,20 +739,16 @@
                 if(data.date) dates.push(data.date);
             });
 
-            // Calc Total Hours
             const h = Math.floor(totalMins / 60);
             const m = totalMins % 60;
             document.getElementById('totalFocus').textContent = `${h}h ${m}m`;
 
-            // Calc Streak
             const uniqueDates = [...new Set(dates)].sort();
             let streak = 0;
             if(uniqueDates.length > 0) {
-                // Simple contiguous streak calc
                 let currentStreak = 1;
                 const todayStr = new Date().toISOString().slice(0, 10);
                 
-                // If last session was not today or yesterday, streak is broken
                 const lastSessionDate = new Date(uniqueDates[uniqueDates.length-1]);
                 const diffTime = Math.abs(new Date(todayStr) - lastSessionDate);
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
@@ -770,7 +756,6 @@
                 if (diffDays > 1) {
                     streak = 0;
                 } else {
-                    // Iterate backwards
                     streak = 1; 
                     for(let i = uniqueDates.length - 1; i > 0; i--) {
                         const d1 = new Date(uniqueDates[i]);
@@ -787,8 +772,6 @@
             document.getElementById('streakCounter').textContent = `${streak} 🔥`;
 
             renderGitHubGraph(sessionData);
-            
-            // 2. Fetch Tasks
             renderTasks();
         }
 
@@ -821,7 +804,6 @@
 
             if(!title || !userId) return;
 
-            // Loading State
             const originalText = saveBtn.textContent;
             saveBtn.disabled = true;
             saveBtn.innerHTML = `<div class="flex items-center justify-center"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i></div>`;
@@ -872,23 +854,28 @@
              }
         };
 
+        function formatMinutes(mins) {
+            if (!mins) return '0m';
+            const h = Math.floor(mins / 60);
+            const m = mins % 60;
+            if (h > 0) return `${h}h ${m}m`;
+            return `${m}m`;
+        }
+
         async function renderTasks() {
             if (!userId) return;
             
             const tasksSnap = await getDocs(getTasksRef());
             let tasks = [];
             
-            // 1. Fetch all tasks
             tasksSnap.forEach(doc => tasks.push({id: doc.id, ...doc.data()}));
             
-            // 2. Fetch subtasks for each task (Nested Collection)
             await Promise.all(tasks.map(async (task) => {
                 const subSnap = await getDocs(getTaskSubtasksRef(task.id));
                 task.subtasks = [];
                 subSnap.forEach(subDoc => {
                     task.subtasks.push({id: subDoc.id, ...subDoc.data()});
                 });
-                // Sort subtasks by creation time
                 task.subtasks.sort((a,b) => a.created_at - b.created_at);
             }));
             
@@ -916,10 +903,12 @@
             }
 
             tasks.forEach(task => {
-                // Use the subtasks we fetched earlier
                 const subtasks = task.subtasks || [];
                 const completedSubtasks = subtasks.filter(s => s.is_completed).length;
                 const progressPct = subtasks.length > 0 ? (completedSubtasks / subtasks.length) * 100 : 0;
+                
+                const totalMinutes = task.total_minutes || 0;
+                const timeDisplay = formatMinutes(totalMinutes);
 
                 const el = document.createElement('div');
                 el.className = `rounded-lg border mb-3 overflow-hidden transition-all ${
@@ -949,16 +938,21 @@
                             </button>
                             <div class="flex-1 overflow-hidden">
                                 <div class="font-medium text-sm truncate ${task.is_completed ? 'line-through text-gray-500' : ''}">${task.title}</div>
-                                ${subtasks.length > 0 ? `
-                                    <div class="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-2">
-                                        <div class="h-full bg-green-500 rounded-full transition-all" style="width: ${progressPct}%"></div>
-                                    </div>
-                                ` : ''}
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-[10px] text-gray-400 flex items-center gap-1 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                                        <i data-lucide="clock" class="w-3 h-3"></i> ${timeDisplay}
+                                    </span>
+                                    ${subtasks.length > 0 ? `
+                                        <div class="w-20 h-1 bg-gray-200 dark:bg-gray-700 rounded-full">
+                                            <div class="h-full bg-green-500 rounded-full transition-all" style="width: ${progressPct}%"></div>
+                                        </div>
+                                    ` : ''}
+                                </div>
                             </div>
                         </div>
                         <div class="flex flex-col items-end gap-1">
                             <div class="text-xs font-mono text-gray-500 font-bold whitespace-nowrap">
-                                <span class="text-base sm:text-lg">${task.act_pomodoros}</span>/<span class="text-xs sm:text-sm">${task.est_pomodoros}</span>
+                                <span class="text-base sm:text-lg">${task.act_pomodoros || 0}</span>/<span class="text-xs sm:text-sm">${task.est_pomodoros}</span>
                             </div>
                             <div class="flex items-center gap-1">
                                 <button class="text-gray-400 hover:text-blue-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); toggleSubtaskInput('${task.id}')" title="Add Subtask">
@@ -1000,16 +994,13 @@
             const title = input.value;
             if(!title) return;
             
-            // Loading UI
             const originalContent = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i>`;
             lucide.createIcons();
 
             try {
-                // <-- WRITE to Firestore Subcollection
                 await addDoc(getTaskSubtasksRef(taskId), {
-                    parent_task_id: taskId,
                     title: title,
                     is_completed: 0,
                     created_at: Date.now()
@@ -1018,21 +1009,18 @@
             } catch (error) {
                 console.error("Error adding subtask:", error);
                 showSnackbar("Failed to add subtask", "error");
-                // Restore button state on error (success state is handled by re-render)
                 btn.disabled = false;
                 btn.innerHTML = originalContent;
             }
         };
 
         window.deleteSubtask = async (subId, taskId) => {
-            // <-- WRITE to Firestore Subcollection
             await deleteDoc(doc(getTaskSubtasksRef(taskId), subId));
             renderTasks();
         };
 
         window.toggleSubtaskComplete = async (subId, currentStatus, taskId) => {
             const newStatus = currentStatus ? 0 : 1;
-            // <-- WRITE to Firestore Subcollection
             await updateDoc(doc(getTaskSubtasksRef(taskId), subId), { is_completed: newStatus });
             renderTasks();
         };
@@ -1048,7 +1036,6 @@
             });
             await Promise.all(batchPromises);
             
-            // <-- WRITE to Firestore
             await updateDoc(doc(getTasksRef(), id), { is_active: 1 });
             renderTasks();
         };
@@ -1056,7 +1043,6 @@
         window.toggleTaskComplete = async (id, currentStatus) => {
             const newStatus = currentStatus ? 0 : 1;
             const completedAt = newStatus === 1 ? Date.now() : null;
-            // <-- WRITE to Firestore
             await updateDoc(doc(getTasksRef(), id), {
                 is_completed: newStatus,
                 is_active: 0,
@@ -1068,14 +1054,12 @@
         window.deleteTask = async (id, btn) => {
             if(confirm("Delete this task and all its subtasks?")) {
                 
-                // Show Loading Spinner
                 const originalContent = btn.innerHTML;
                 btn.disabled = true;
                 btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-red-500"></i>`;
                 lucide.createIcons();
 
                 try {
-                    // 1. Delete all subtasks first (Manual Cascade)
                     const subRef = getTaskSubtasksRef(id);
                     const subSnap = await getDocs(subRef);
                     const batchPromises = [];
@@ -1084,14 +1068,12 @@
                     });
                     await Promise.all(batchPromises);
 
-                    // 2. Delete parent task
                     await deleteDoc(doc(getTasksRef(), id));
                     
                     renderTasks();
                 } catch (error) {
                     console.error("Error deleting task:", error);
                     showSnackbar("Failed to delete task", "error");
-                    // Restore button state on error
                     btn.innerHTML = originalContent;
                     btn.disabled = false;
                     lucide.createIcons();
@@ -1398,15 +1380,18 @@
                     const snapshot = await getDocs(getTasksRef());
                     let activeTaskId = null;
                     let currentAct = 0;
+                    let currentTotalMinutes = 0;
+                    
                     snapshot.forEach(d => {
                         const t = d.data();
                         if(t.is_active === 1) {
                             activeTaskId = d.id;
                             currentAct = t.act_pomodoros || 0;
+                            currentTotalMinutes = t.total_minutes || 0;
                         }
                     });
 
-                    // <-- WRITE to Firestore
+                    // 1. Log Session to cloud
                     await addDoc(getSessionsRef(), {
                         date: new Date().toISOString().slice(0, 10),
                         duration: completedTime,
@@ -1414,13 +1399,17 @@
                         task_id: activeTaskId
                     });
 
+                    // 2. Update Task stats in cloud
                     if(activeTaskId) {
-                        await updateDoc(doc(getTasksRef(), activeTaskId), { act_pomodoros: currentAct + 1 });
+                        await updateDoc(doc(getTasksRef(), activeTaskId), { 
+                            act_pomodoros: currentAct + 1,
+                            total_minutes: currentTotalMinutes + completedTime 
+                        });
                     }
                     loadFromFirestore();
                 }
 
-                showSnackbar("Focus session complete!", "success");
+                showSnackbar("Focus session saved to cloud!", "success");
                 window.startTimer(parseInt(breakSelect.value), "break");
             } else {
                 showSnackbar("Break over! Ready to focus?", "info");
