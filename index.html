@@ -543,11 +543,24 @@
         
         // --- NOTE FOR DEPLOYMENT ---
         // When deploying to GitHub Pages or production, REPLACE the line below:
-         const firebaseConfig = JSON.parse(__firebase_config);
+        // const firebaseConfig = JSON.parse(__firebase_config);
         
-        // const firebaseConfigRaw = "FIREBASE_CONFIG_PLACEHOLDER"; 
+        const firebaseConfigRaw = "FIREBASE_CONFIG_PLACEHOLDER"; 
         
-        // const firebaseConfig = JSON.parse(__firebase_config) 
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : (typeof firebaseConfigRaw === 'object' ? firebaseConfigRaw : {
+                // FALLBACK: If you are running locally without the injection script,
+                // you must manually set your keys here or use the __firebase_config env var.
+                // We do not commit secrets to the repo.
+                apiKey: "",
+                authDomain: "",
+                projectId: "",
+                storageBucket: "",
+                messagingSenderId: "",
+                appId: "",
+                measurementId: ""
+            });
 
         let app, auth, db, provider;
 
