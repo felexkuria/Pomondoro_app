@@ -451,29 +451,18 @@
 
         // -------------------- Firebase Integration --------------------
         
-        // --- NOTE FOR DEPLOYMENT ---
-        // When deploying to GitHub Pages or production, REPLACE the line below:
-        // const firebaseConfig = JSON.parse(__firebase_config);
-        //
-        // WITH your actual config like this (best used with GitHub Secrets replacements):
-        // const firebaseConfig = {
-        //   apiKey: "AIzaSyD8-L4FiV_YfEfd8UkHXz",
-        //   authDomain: "pomondoro-348.firebase",
-        //   projectId: "pomondoroe48",
-        //   storageBucket: "pomondoro-348.firebasestorage.app",
-        //   messagingSenderId: "106638145148",
-        //   appId: "1:10663814514\\58:web:\",
-        //   measurementId: "G-T8PDE\RH"
-        // };
+        // This 'firebaseConfig' variable is a PLACEHOLDER.
+        // It will be replaced by your GitHub Action Workflow during deployment using the secret you provided.
+        // In the local/preview environment, it falls back to __firebase_config if available.
         
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-             // Fallback for local testing if needed, or placeholders for replacement
-             apiKey: "firebaseConfig",
-             authDomain: "firebaseConfig",
-             projectId: "firebaseConfig"
-        };
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : "FIREBASE_CONFIG_PLACEHOLDER";
 
-        const app = initializeApp(firebaseConfig);
+        // Logic to parse the config if it's a string (which happens if replacement fails or local string used)
+        const configToUse = typeof firebaseConfig === 'string' && firebaseConfig !== "FIREBASE_CONFIG_PLACEHOLDER" 
+                            ? JSON.parse(firebaseConfig) 
+                            : (typeof firebaseConfig === 'object' ? firebaseConfig : {});
+
+        const app = initializeApp(configToUse);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
