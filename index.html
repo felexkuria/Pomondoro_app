@@ -619,7 +619,9 @@
         // -------------------- Firestore Logic --------------------
         
         const getTasksRef = () => collection(db, 'artifacts', appId, 'users', userId, 'tasks');
-        const getSubtasksRef = () => collection(db, 'artifacts', appId, 'users', userId, 'subtasks');
+        // New: Subtasks are now a sub-collection of a specific task
+        const getTaskSubtasksRef = (taskId) => collection(db, 'artifacts', appId, 'users', userId, 'tasks', taskId, 'subtasks');
+        
         const getSessionsRef = () => collection(db, 'artifacts', appId, 'users', userId, 'focus_sessions');
         const getSettingsRef = () => collection(db, 'artifacts', appId, 'users', userId, 'settings');
 
@@ -875,16 +877,25 @@
             
             const tasksSnap = await getDocs(getTasksRef());
             let tasks = [];
+            
+            // 1. Fetch all tasks
             tasksSnap.forEach(doc => tasks.push({id: doc.id, ...doc.data()}));
+            
+            // 2. Fetch subtasks for each task (Nested Collection)
+            await Promise.all(tasks.map(async (task) => {
+                const subSnap = await getDocs(getTaskSubtasksRef(task.id));
+                task.subtasks = [];
+                subSnap.forEach(subDoc => {
+                    task.subtasks.push({id: subDoc.id, ...subDoc.data()});
+                });
+                // Sort subtasks by creation time
+                task.subtasks.sort((a,b) => a.created_at - b.created_at);
+            }));
             
             tasks.sort((a, b) => {
                 if (a.is_completed !== b.is_completed) return a.is_completed - b.is_completed;
                 return b.created_at - a.created_at;
             });
-
-            const subSnap = await getDocs(getSubtasksRef());
-            const allSubtasks = [];
-            subSnap.forEach(doc => allSubtasks.push({id: doc.id, ...doc.data()}));
 
             const listEl = document.getElementById('taskList');
             listEl.innerHTML = '';
@@ -905,7 +916,8 @@
             }
 
             tasks.forEach(task => {
-                const subtasks = allSubtasks.filter(s => s.parent_task_id === task.id).sort((a,b) => a.created_at - b.created_at);
+                // Use the subtasks we fetched earlier
+                const subtasks = task.subtasks || [];
                 const completedSubtasks = subtasks.filter(s => s.is_completed).length;
                 const progressPct = subtasks.length > 0 ? (completedSubtasks / subtasks.length) * 100 : 0;
 
@@ -918,11 +930,11 @@
                 subtasks.forEach(sub => {
                     subtasksHtml += `
                         <div class="flex items-center gap-2 py-1 ml-4 subtask-line">
-                             <button onclick="toggleSubtaskComplete('${sub.id}', ${sub.is_completed})" class="text-gray-400 hover:text-green-500 p-1">
+                             <button onclick="toggleSubtaskComplete('${sub.id}', ${sub.is_completed}, '${task.id}')" class="text-gray-400 hover:text-green-500 p-1">
                                 <i data-lucide="${sub.is_completed ? 'check-square' : 'square'}" class="w-4 h-4 ${sub.is_completed ? 'text-green-500' : ''}"></i>
                              </button>
                              <span class="text-xs ${sub.is_completed ? 'line-through text-gray-400' : 'text-gray-600 dark:text-gray-300'}">${sub.title}</span>
-                             <button onclick="deleteSubtask('${sub.id}')" class="ml-auto text-gray-400 hover:text-red-400 p-1">
+                             <button onclick="deleteSubtask('${sub.id}', '${task.id}')" class="ml-auto text-gray-400 hover:text-red-400 p-1">
                                 <i data-lucide="x" class="w-3 h-3"></i>
                              </button>
                         </div>
@@ -969,7 +981,7 @@
                     <div id="add-subtask-form-${task.id}" class="hidden px-3 pb-3 pt-1 border-t border-gray-100 dark:border-gray-700/50">
                         <div class="flex gap-2">
                             <input type="text" id="subtask-input-${task.id}" placeholder="Subtask name..." class="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-green-500">
-                            <button onclick="addSubtask('${task.id}')" class="px-2 py-1 bg-green-500 text-white rounded text-xs">Add</button>
+                            <button onclick="addSubtask('${task.id}', this)" class="px-2 py-1 bg-green-500 text-white rounded text-xs flex items-center justify-center min-w-[40px]">Add</button>
                         </div>
                     </div>
                 `;
@@ -983,31 +995,45 @@
             form.classList.toggle('hidden');
         };
 
-        window.addSubtask = async (taskId) => {
+        window.addSubtask = async (taskId, btn) => {
             const input = document.getElementById(`subtask-input-${taskId}`);
             const title = input.value;
             if(!title) return;
             
-            // <-- WRITE to Firestore
-            await addDoc(getSubtasksRef(), {
-                parent_task_id: taskId,
-                title: title,
-                is_completed: 0,
-                created_at: Date.now()
-            });
+            // Loading UI
+            const originalContent = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i>`;
+            lucide.createIcons();
+
+            try {
+                // <-- WRITE to Firestore Subcollection
+                await addDoc(getTaskSubtasksRef(taskId), {
+                    parent_task_id: taskId,
+                    title: title,
+                    is_completed: 0,
+                    created_at: Date.now()
+                });
+                renderTasks();
+            } catch (error) {
+                console.error("Error adding subtask:", error);
+                showSnackbar("Failed to add subtask", "error");
+                // Restore button state on error (success state is handled by re-render)
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        };
+
+        window.deleteSubtask = async (subId, taskId) => {
+            // <-- WRITE to Firestore Subcollection
+            await deleteDoc(doc(getTaskSubtasksRef(taskId), subId));
             renderTasks();
         };
 
-        window.deleteSubtask = async (subId) => {
-            // <-- WRITE to Firestore
-            await deleteDoc(doc(getSubtasksRef(), subId));
-            renderTasks();
-        };
-
-        window.toggleSubtaskComplete = async (subId, currentStatus) => {
+        window.toggleSubtaskComplete = async (subId, currentStatus, taskId) => {
             const newStatus = currentStatus ? 0 : 1;
-            // <-- WRITE to Firestore
-            await updateDoc(doc(getSubtasksRef(), subId), { is_completed: newStatus });
+            // <-- WRITE to Firestore Subcollection
+            await updateDoc(doc(getTaskSubtasksRef(taskId), subId), { is_completed: newStatus });
             renderTasks();
         };
 
@@ -1049,16 +1075,18 @@
                 lucide.createIcons();
 
                 try {
-                    // <-- WRITE to Firestore
-                    await deleteDoc(doc(getTasksRef(), id));
-                    const subSnap = await getDocs(getSubtasksRef()); 
-                    const subDeletes = [];
+                    // 1. Delete all subtasks first (Manual Cascade)
+                    const subRef = getTaskSubtasksRef(id);
+                    const subSnap = await getDocs(subRef);
+                    const batchPromises = [];
                     subSnap.forEach(d => {
-                        if(d.data().parent_task_id === id) {
-                            subDeletes.push(deleteDoc(doc(getSubtasksRef(), d.id)));
-                        }
+                        batchPromises.push(deleteDoc(doc(subRef, d.id)));
                     });
-                    await Promise.all(subDeletes);
+                    await Promise.all(batchPromises);
+
+                    // 2. Delete parent task
+                    await deleteDoc(doc(getTasksRef(), id));
+                    
                     renderTasks();
                 } catch (error) {
                     console.error("Error deleting task:", error);
