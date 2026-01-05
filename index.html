@@ -189,6 +189,12 @@
              </div>
           </div>
 
+          <!-- Calendar Button (New) -->
+          <button id="openCalendar" class="flex items-center gap-2 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              <i data-lucide="calendar" class="w-4 h-4 text-blue-500"></i>
+              <span class="text-xs sm:text-sm font-medium hidden sm:inline">Calendar</span>
+          </button>
+
           <!-- Google Login / User Profile -->
           <div id="authSection" class="flex items-center">
               <button id="googleLoginBtn" class="flex items-center gap-2 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
@@ -386,10 +392,10 @@
                 <div class="flex items-center gap-1.5 sm:gap-2 mt-4 text-[10px] sm:text-xs text-gray-500 justify-end">
                     <span>Less</span>
                     <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-gray-200 dark:bg-gray-700 rounded-[2px]"></div>
-                    <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-200 rounded-[2px]"></div>
-                    <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-400 rounded-[2px]"></div>
-                    <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-600 rounded-[2px]"></div>
-                    <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-900 rounded-[2px]"></div>
+                    <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-200 dark:bg-green-900 rounded-[2px]"></div>
+                    <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-400 dark:bg-green-700 rounded-[2px]"></div>
+                    <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-600 dark:bg-green-500 rounded-[2px]"></div>
+                    <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-900 dark:bg-green-300 rounded-[2px]"></div>
                     <span>More</span>
                 </div>
             </div>
@@ -416,6 +422,24 @@
                     Save Music URL
                   </button>
               </form>
+          </div>
+      </div>
+
+      <!-- Calendar Dashboard Modal (New) -->
+      <div id="calendarModal" class="fixed inset-0 z-[70] hidden flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                  <h3 class="text-lg font-bold flex items-center gap-2">
+                      <i data-lucide="calendar-days" class="w-5 h-5 text-blue-500"></i> Schedule & Dashboard
+                  </h3>
+                  <button id="closeCalendar" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                      <i data-lucide="x" class="w-5 h-5"></i>
+                  </button>
+              </div>
+              <div class="flex-1 w-full bg-white relative">
+                   <div class="absolute inset-0 flex items-center justify-center text-gray-400 z-0">Loading Calendar...</div>
+                   <iframe src="https://calendar.google.com/calendar/embed?src=engineerfelex%40gmail.com&ctz=Africa%2FNairobi" style="border: 0" width="100%" height="100%" frameborder="0" scrolling="no" class="relative z-10"></iframe>
+              </div>
           </div>
       </div>
 
@@ -570,6 +594,10 @@
                         document.getElementById('musicToggle').checked = enabled;
                         // Don't auto-show modal on load, just set state
                     }
+                    // Pre-fill Music URL if exists
+                    if(cachedSettings.custom_music_url) {
+                        document.getElementById('videoUrl').value = cachedSettings.custom_music_url;
+                    }
                 }
             } catch (e) {
                 console.error("Error loading settings", e);
@@ -670,27 +698,43 @@
         document.getElementById('saveTask').addEventListener('click', async () => {
             const title = document.getElementById('newTaskTitle').value;
             const est = document.getElementById('newTaskEst').value;
+            const saveBtn = document.getElementById('saveTask');
+
             if(!title || !userId) return;
 
-            if (editingTaskId) {
-                await updateDoc(doc(getTasksRef(), editingTaskId), {
-                    title: title,
-                    est_pomodoros: parseInt(est)
-                });
-                showSnackbar("Task updated!", "success");
-            } else {
-                await addDoc(getTasksRef(), {
-                    title: title,
-                    est_pomodoros: parseInt(est),
-                    act_pomodoros: 0,
-                    is_completed: 0,
-                    is_active: 0,
-                    created_at: Date.now()
-                });
+            // Loading State
+            const originalText = saveBtn.textContent;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = `<div class="flex items-center justify-center"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i></div>`;
+            lucide.createIcons();
+
+            try {
+                if (editingTaskId) {
+                    await updateDoc(doc(getTasksRef(), editingTaskId), {
+                        title: title,
+                        est_pomodoros: parseInt(est)
+                    });
+                    showSnackbar("Task updated!", "success");
+                } else {
+                    await addDoc(getTasksRef(), {
+                        title: title,
+                        est_pomodoros: parseInt(est),
+                        act_pomodoros: 0,
+                        is_completed: 0,
+                        is_active: 0,
+                        created_at: Date.now()
+                    });
+                }
+                document.getElementById('addTaskForm').classList.add('hidden');
+                resetForm();
+                renderTasks();
+            } catch (error) {
+                console.error("Error saving task:", error);
+                showSnackbar("Failed to save task", "error");
+                // Restore button on error
+                saveBtn.disabled = false;
+                saveBtn.textContent = originalText;
             }
-            document.getElementById('addTaskForm').classList.add('hidden');
-            resetForm();
-            renderTasks();
         });
 
         window.editTask = async (id) => {
@@ -899,20 +943,36 @@
         importTasksBtn.addEventListener('click', async () => {
             const text = document.getElementById('importText').value;
             if(!text) return;
-            const lines = text.split('\n').filter(line => line.trim() !== '');
-            const promises = lines.map(line => addDoc(getTasksRef(), {
-                title: line.trim(),
-                est_pomodoros: 1,
-                act_pomodoros: 0,
-                is_completed: 0,
-                is_active: 0,
-                created_at: Date.now()
-            }));
-            await Promise.all(promises);
-            renderTasks();
-            document.getElementById('importText').value = '';
-            syncModal.classList.add('hidden');
-            showSnackbar(`Imported ${lines.length} tasks!`, "success");
+            
+            // Loading State
+            const originalText = importTasksBtn.innerHTML;
+            importTasksBtn.disabled = true;
+            importTasksBtn.innerHTML = `<div class="flex items-center justify-center gap-2"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Importing...</div>`;
+            lucide.createIcons();
+
+            try {
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                const promises = lines.map(line => addDoc(getTasksRef(), {
+                    title: line.trim(),
+                    est_pomodoros: 1,
+                    act_pomodoros: 0,
+                    is_completed: 0,
+                    is_active: 0,
+                    created_at: Date.now()
+                }));
+                
+                await Promise.all(promises);
+                renderTasks();
+                document.getElementById('importText').value = '';
+                syncModal.classList.add('hidden');
+                showSnackbar(`Imported ${lines.length} tasks!`, "success");
+            } catch (e) {
+                console.error("Import error:", e);
+                showSnackbar("Error importing tasks", "error");
+            } finally {
+                importTasksBtn.disabled = false;
+                importTasksBtn.innerHTML = originalText;
+            }
         });
 
         copyToRemindersBtn.addEventListener('click', async () => {
@@ -1051,9 +1111,21 @@
         function animateTree(total, current) {
             if (!tree) return;
             const progress = 1 - (current / total);
+            
+            // Growth Stages Logic
+            let stage = '🌱';
+            if (progress >= 0.25 && progress < 0.5) stage = '🌿';
+            else if (progress >= 0.5 && progress < 0.75) stage = '🌲';
+            else if (progress >= 0.75) stage = '🌳';
+            
+            if (tree.textContent !== stage) {
+                tree.textContent = stage;
+            }
+
             const scale = 1 + (progress * 0.5);
             tree.style.setProperty('--scale', scale);
             tree.style.transform = `scale(${scale})`;
+            
             if (progress > 0.9 && !tree.classList.contains('tree-bounce')) {
                 tree.classList.add('tree-bounce');
             } else if (progress <= 0.9) {
@@ -1122,6 +1194,9 @@
             
             updateTimerDisplay(defaultTime * 60, defaultTime * 60);
             timerRing.style.strokeDashoffset = 283;
+            
+            // Reset Tree
+            tree.textContent = '🌱';
             tree.style.setProperty('--scale', 1);
             tree.style.transform = 'scale(1)';
             tree.classList.remove('tree-bounce', 'hidden');
@@ -1230,11 +1305,11 @@
                 const dateStr = currentDate.toISOString().slice(0, 10);
                 const mins = dataMap[dateStr] || 0;
                 let colorClass = 'bg-gray-200 dark:bg-gray-700'; // Fixed for Dark Mode visibility
-                if (mins > 0) colorClass = 'bg-green-200';
-                if (mins > 30) colorClass = 'bg-green-300';
-                if (mins > 60) colorClass = 'bg-green-400';
-                if (mins > 120) colorClass = 'bg-green-500';
-                if (mins > 240) colorClass = 'bg-green-900';
+                if (mins > 0) colorClass = 'bg-green-200 dark:bg-green-900';
+                if (mins > 30) colorClass = 'bg-green-300 dark:bg-green-800';
+                if (mins > 60) colorClass = 'bg-green-400 dark:bg-green-700';
+                if (mins > 120) colorClass = 'bg-green-500 dark:bg-green-600';
+                if (mins > 240) colorClass = 'bg-green-900 dark:bg-green-500';
 
                 const cell = document.createElement('div');
                 cell.className = `contrib-cell ${colorClass} relative group`;
@@ -1284,6 +1359,19 @@
             musicPlayerContainer.classList.add('translate-y-[150%]');
             youtubePlayer.src = "";
         }
+
+        // Calendar Modal Logic
+        const calendarModal = document.getElementById('calendarModal');
+        const openCalendarBtn = document.getElementById('openCalendar');
+        const closeCalendarBtn = document.getElementById('closeCalendar');
+
+        openCalendarBtn.addEventListener('click', () => {
+            calendarModal.classList.remove('hidden');
+        });
+
+        closeCalendarBtn.addEventListener('click', () => {
+            calendarModal.classList.add('hidden');
+        });
 
         // Break Music Settings Modal Logic
         const musicSettingsModal = document.getElementById('musicSettingsModal');
