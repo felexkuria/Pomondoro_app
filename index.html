@@ -566,12 +566,13 @@
         };
         // Trigger init check
         onAuthStateChanged(auth, async (user) => {
+            const loginBtn = document.getElementById('googleLoginBtn');
+            const userProfile = document.getElementById('userProfile');
+            const userAvatar = document.getElementById('userAvatar');
+
             if (user) {
+                // --- USER IS LOGGED IN ---
                 userId = user.uid;
-                
-                const loginBtn = document.getElementById('googleLoginBtn');
-                const userProfile = document.getElementById('userProfile');
-                const userAvatar = document.getElementById('userAvatar');
 
                 if (!user.isAnonymous) {
                     loginBtn.classList.add('hidden');
@@ -589,7 +590,23 @@
                 loadFromFirestore();
                 restoreLocalState();
             } else {
-                await signInAnonymously(auth);
+                // --- USER IS LOGGED OUT (Guest/Default Data) ---
+                userId = null;
+                cachedSettings = {}; // Clear settings
+                
+                // Show Login Button
+                loginBtn.classList.remove('hidden');
+                userProfile.classList.add('hidden');
+
+                // Clear Data from UI
+                document.getElementById('totalFocus').textContent = "0h 0m";
+                document.getElementById('streakCounter').textContent = "0 🔥";
+                document.getElementById('githubGraph').innerHTML = '<div class="text-xs text-gray-500 p-2">Sign in to view activity history</div>';
+                document.getElementById('taskList').innerHTML = '<div class="text-center text-gray-500 py-8 italic text-sm">Sign in with Google to manage your tasks.</div>';
+                document.getElementById('currentTaskDisplay').classList.add('hidden');
+                
+                // Reset Theme to default if needed, or leave as last selected
+                // (Optional: resetTimer() here if you want to stop timer on logout)
             }
         });
 
@@ -638,14 +655,17 @@
                         const enabled = cachedSettings.music_enabled === 'true';
                         document.getElementById('musicToggle').checked = enabled;
                     }
+                    // Pre-fill Break Music URL if exists
                     if(cachedSettings.custom_music_url) {
                         document.getElementById('videoUrl').value = cachedSettings.custom_music_url;
                     }
                     
+                    // Initialize Focus Music
                     const type = cachedSettings.focus_music_type || 'youtube';
                     const url = cachedSettings.focus_music_url;
                     updateFocusMusicPlayer(type, url);
                     
+                    // Pre-fill Focus Settings Form
                     const rbs = document.querySelectorAll('input[name="focusSource"]');
                     for(const rb of rbs) {
                         if(rb.value === type) rb.checked = true;
@@ -653,11 +673,12 @@
                     if(url) document.getElementById('focusVideoUrl').value = url;
                     
                 } else {
+                    // Initialize default focus music if no settings exist
                     updateFocusMusicPlayer('youtube', null);
                 }
             } catch (e) {
                 console.error("Error loading settings", e);
-                updateFocusMusicPlayer('youtube', null); 
+                updateFocusMusicPlayer('youtube', null); // Fallback
             }
         }
 
@@ -691,33 +712,36 @@
                     src = defaultSpotify;
                 }
                 
+                // Spotify styles: Needs fixed height, remove absolute positioning
                 container.style.aspectRatio = "auto";
-                container.style.height = "auto"; 
-                container.classList.remove('absolute', 'inset-0'); 
+                container.style.height = "auto"; // Let content dictate height
+                container.classList.remove('absolute', 'inset-0'); // Safety removal if added to container
                 
                 player.style.height = "352px"; 
-                player.style.position = "relative"; 
-                player.classList.remove('absolute', 'inset-0', 'h-full'); 
+                player.style.position = "relative"; // Reset position
+                player.classList.remove('absolute', 'inset-0', 'h-full'); // Remove Tailwind absolute classes
                 
                 player.src = src;
                 player.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
                 
             } else {
+                // Default YouTube (Lofi Girl)
                 const defaultYT = `https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=0`;
                 
                 if (url) {
-                    const embedUrl = getEmbedUrl(url); 
+                    const embedUrl = getEmbedUrl(url); // Re-use existing YT parser
                     src = embedUrl ? embedUrl : defaultYT;
                 } else {
                     src = defaultYT;
                 }
                 
+                // YouTube styles: Needs 16:9 Aspect Ratio and Absolute positioning
                 container.style.aspectRatio = "16/9";
                 container.style.height = "auto"; 
                 
                 player.style.height = "100%";
-                player.style.position = ""; 
-                player.classList.add('absolute', 'inset-0', 'h-full'); 
+                player.style.position = ""; // Reset inline style
+                player.classList.add('absolute', 'inset-0', 'h-full'); // Add back Tailwind classes
                 
                 player.src = src;
                 player.allow = "autoplay; encrypted-media; picture-in-picture";
@@ -727,6 +751,7 @@
         async function loadFromFirestore() {
             if(!userId) return;
             
+            // 1. Fetch Sessions for Stats (Full History)
             const sessionsSnap = await getDocs(getSessionsRef());
             let totalMins = 0;
             const sessionData = [];
@@ -739,16 +764,20 @@
                 if(data.date) dates.push(data.date);
             });
 
+            // Calc Total Hours
             const h = Math.floor(totalMins / 60);
             const m = totalMins % 60;
             document.getElementById('totalFocus').textContent = `${h}h ${m}m`;
 
+            // Calc Streak
             const uniqueDates = [...new Set(dates)].sort();
             let streak = 0;
             if(uniqueDates.length > 0) {
+                // Simple contiguous streak calc
                 let currentStreak = 1;
                 const todayStr = new Date().toISOString().slice(0, 10);
                 
+                // If last session was not today or yesterday, streak is broken
                 const lastSessionDate = new Date(uniqueDates[uniqueDates.length-1]);
                 const diffTime = Math.abs(new Date(todayStr) - lastSessionDate);
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
@@ -756,6 +785,7 @@
                 if (diffDays > 1) {
                     streak = 0;
                 } else {
+                    // Iterate backwards
                     streak = 1; 
                     for(let i = uniqueDates.length - 1; i > 0; i--) {
                         const d1 = new Date(uniqueDates[i]);
@@ -772,6 +802,8 @@
             document.getElementById('streakCounter').textContent = `${streak} 🔥`;
 
             renderGitHubGraph(sessionData);
+            
+            // 2. Fetch Tasks
             renderTasks();
         }
 
@@ -804,6 +836,7 @@
 
             if(!title || !userId) return;
 
+            // Loading State
             const originalText = saveBtn.textContent;
             saveBtn.disabled = true;
             saveBtn.innerHTML = `<div class="flex items-center justify-center"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i></div>`;
@@ -1028,14 +1061,12 @@
         window.setActiveTask = async (id) => {
             const snapshot = await getDocs(getTasksRef());
             const batchPromises = [];
-            
             snapshot.forEach(d => {
                 if(d.data().is_active === 1) {
                     batchPromises.push(updateDoc(doc(getTasksRef(), d.id), { is_active: 0 }));
                 }
             });
             await Promise.all(batchPromises);
-            
             await updateDoc(doc(getTasksRef(), id), { is_active: 1 });
             renderTasks();
         };
@@ -1420,8 +1451,8 @@
         // Attach listeners
         startButton.addEventListener('click', async () => {
             const user = auth.currentUser;
-            if (user && user.isAnonymous) {
-                const proceed = confirm("Sign in with Google to save your stats permanently? Cancel to continue anonymously.");
+            if (!user) {
+                const proceed = confirm("Sign in with Google to save your stats permanently? Cancel to continue locally (data won't be saved).");
                 if (proceed) {
                     try {
                         await window.loginWithGoogle();
