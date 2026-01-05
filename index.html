@@ -9,8 +9,6 @@
     />
     <title>Pomodoro Focus App</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load sql.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <script>
@@ -189,8 +187,8 @@
         </div>
       </div>
 
-      <!-- SQL Status Indicator -->
-      <div id="dbStatus" class="text-xs text-center text-gray-400 mb-4 opacity-0 transition-opacity">Database Loaded</div>
+      <!-- DB Status Indicator -->
+      <div id="dbStatus" class="text-xs text-center text-gray-400 mb-4 opacity-0 transition-opacity">Cloud Storage Connected</div>
 
       <!-- Main Timer & Tasks Grid -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 mb-12">
@@ -284,7 +282,7 @@
                          <i data-lucide="refresh-cw" class="w-4 h-4"></i> Sync with Apple Reminders
                     </h3>
                     <p class="text-xs text-gray-500 mb-3">
-                        Due to browser privacy rules, we cannot directly access your Reminders. Use this bridge instead.
+                        Use this bridge to import tasks from other apps or copy your list to clipboard.
                     </p>
                     
                     <div class="flex gap-2 mb-3">
@@ -294,7 +292,7 @@
                     </div>
                     
                     <div class="border-t border-gray-200 dark:border-gray-700 pt-3">
-                         <label class="block text-xs font-medium mb-1 text-gray-600 dark:text-gray-400">Import from Reminders (Paste text here):</label>
+                         <label class="block text-xs font-medium mb-1 text-gray-600 dark:text-gray-400">Import from Clipboard (Paste text here):</label>
                          <textarea id="importText" rows="3" class="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-800 focus:outline-none mb-2" placeholder="Paste your list..."></textarea>
                          <button id="importTasksBtn" class="w-full px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-xs rounded-lg">
                             Import Tasks
@@ -321,8 +319,7 @@
 
                 <!-- Task List -->
                 <div id="taskList" class="space-y-4 max-h-[500px] overflow-y-auto pr-1">
-                    <!-- Tasks injected via JS -->
-                    <div class="text-center text-gray-500 py-4 italic text-sm">No tasks yet. Add one to get started!</div>
+                    <div class="text-center text-gray-500 py-4 italic text-sm">Loading tasks...</div>
                 </div>
             </div>
         </div>
@@ -427,7 +424,11 @@
 
     </div>
     
-    <script>
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
         // Init Icons
         lucide.createIcons();
 
@@ -448,223 +449,233 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // -------------------- SQL.js Integration --------------------
-        let db;
-        let SQL;
-        let editingTaskId = null; // Global state for editing
-
-        function saveDB() {
-            if (!db) return;
-            try {
-                const data = db.export();
-                const buffer = new Uint8Array(data);
-                const binary = String.fromCharCode.apply(null, buffer);
-                localStorage.setItem("pomodoro_sqlite_db", btoa(binary));
-            } catch (e) {
-                console.error("Save failed", e);
-            }
-        }
-
-        async function initDB() {
-            const config = {
-                locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}`
-            };
-            
-            try {
-                SQL = await initSqlJs(config);
-                const savedDB = localStorage.getItem("pomodoro_sqlite_db");
-                
-                if (savedDB) {
-                    const binary = atob(savedDB);
-                    const bytes = new Uint8Array(binary.length);
-                    for (let i = 0; i < binary.length; i++) {
-                        bytes[i] = binary.charCodeAt(i);
-                    }
-                    db = new SQL.Database(bytes);
-                } else {
-                    db = new SQL.Database();
-                }
-
-                // Create Tables (Analytics Friendly Schema)
-                db.run(`
-                    CREATE TABLE IF NOT EXISTS focus_sessions (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        date TEXT,
-                        duration INTEGER,
-                        timestamp INTEGER,
-                        task_id INTEGER
-                    );
-                    CREATE TABLE IF NOT EXISTS app_settings (
-                        key TEXT PRIMARY KEY,
-                        value TEXT
-                    );
-                    CREATE TABLE IF NOT EXISTS tasks (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        title TEXT,
-                        est_pomodoros INTEGER DEFAULT 1,
-                        act_pomodoros INTEGER DEFAULT 0,
-                        is_completed INTEGER DEFAULT 0,
-                        is_active INTEGER DEFAULT 0,
-                        created_at INTEGER,
-                        completed_at INTEGER
-                    );
-                    CREATE TABLE IF NOT EXISTS subtasks (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        parent_task_id INTEGER,
-                        title TEXT,
-                        is_completed INTEGER DEFAULT 0,
-                        created_at INTEGER
-                    );
-                `);
-                
-                // Add column if missing (migration for existing users)
-                try {
-                    db.run("ALTER TABLE focus_sessions ADD COLUMN task_id INTEGER");
-                } catch(e) {} 
-                
-                try {
-                    db.run("ALTER TABLE tasks ADD COLUMN completed_at INTEGER");
-                } catch(e) {}
-
-                // Init Defaults
-                db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES ('streak', '0')`);
-                db.run(`INSERT OR IGNORE INTO app_settings (key, value) VALUES ('last_session_date', '')`);
-                
-                saveDB();
-                document.getElementById('dbStatus').style.opacity = '1';
-                setTimeout(() => document.getElementById('dbStatus').style.opacity = '0', 3000);
-                
-                loadFromDB();
-                
-            } catch (err) {
-                console.error("SQL Init Error:", err);
-                showSnackbar("Failed to initialize Database", "error");
-            }
-        }
-
-        // Global State
-        let timerState = {
-            intervalID: null,
-            totalSeconds: 0,
-            remainingSeconds: 0,
-            isPaused: false,
-            mode: "focus",
-            endTime: null // Timestamp to handle background tabs
-        };
+        // -------------------- Firebase Integration --------------------
         
-        // -------------------- Data Access Layer --------------------
-        function getSetting(key) {
-            if (!db) return null;
-            const stmt = db.prepare("SELECT value FROM app_settings WHERE key = :key");
-            const result = stmt.getAsObject({':key': key});
-            stmt.free();
-            return result.value;
-        }
+        // --- NOTE FOR DEPLOYMENT ---
+        // When deploying to GitHub Pages or production, REPLACE the line below:
+        // const firebaseConfig = JSON.parse(__firebase_config);
+        //
+        // WITH your actual config like this (best used with GitHub Secrets replacements):
+        // const firebaseConfig = {
+        //   apiKey: "AIzaSyD8-L4FiV_YfEfd8UkHXz",
+        //   authDomain: "pomondoro-348.firebase",
+        //   projectId: "pomondoroe48",
+        //   storageBucket: "pomondoro-348.firebasestorage.app",
+        //   messagingSenderId: "106638145148",
+        //   appId: "1:10663814514\\58:web:\",
+        //   measurementId: "G-T8PDE\RH"
+        // };
+        
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+             // Fallback for local testing if needed, or placeholders for replacement
+             apiKey: "firebaseConfig",
+             authDomain: "firebaseConfig",
+             projectId: "firebaseConfig"
+        };
 
-        function setSetting(key, value) {
-            if (!db) return;
-            db.run("INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)", [key, value]);
-            saveDB();
-        }
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        
+        let userId = null;
+        let editingTaskId = null;
+        let cachedSettings = {};
 
-        // -------------------- Task Logic --------------------
-        const toggleAddTaskBtn = document.getElementById('toggleAddTask');
-        const addTaskForm = document.getElementById('addTaskForm');
-        const cancelAddTaskBtn = document.getElementById('cancelAddTask');
-        const saveTaskBtn = document.getElementById('saveTask');
-        const taskListEl = document.getElementById('taskList');
-        const currentTaskDisplay = document.getElementById('currentTaskDisplay');
-        const currentTaskTitle = document.getElementById('currentTaskTitle');
-        const formTitle = document.getElementById('formTitle');
+        // Auth & Init
+        const initAuth = async () => {
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+          } else {
+            await signInAnonymously(auth);
+          }
+        };
+        initAuth();
 
-        toggleAddTaskBtn.addEventListener('click', () => {
-             resetForm();
-             addTaskForm.classList.remove('hidden');
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                document.getElementById('dbStatus').style.opacity = '1';
+                setTimeout(() => document.getElementById('dbStatus').style.opacity = '0', 5000);
+                await loadSettings();
+                loadFromFirestore();
+            }
         });
 
-        cancelAddTaskBtn.addEventListener('click', () => {
-            addTaskForm.classList.add('hidden');
+        // -------------------- Firestore Logic --------------------
+        
+        // Helper to get collection refs
+        const getTasksRef = () => collection(db, 'artifacts', appId, 'users', userId, 'tasks');
+        const getSubtasksRef = () => collection(db, 'artifacts', appId, 'users', userId, 'subtasks');
+        const getSessionsRef = () => collection(db, 'artifacts', appId, 'users', userId, 'focus_sessions');
+        const getSettingsRef = () => collection(db, 'artifacts', appId, 'users', userId, 'settings');
+
+        async function loadSettings() {
+            if(!userId) return;
+            try {
+                // <-- READ from Firestore
+                const docRef = doc(getSettingsRef(), 'config');
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    cachedSettings = docSnap.data();
+                    // Apply settings
+                    if(cachedSettings.theme) {
+                        document.getElementById('themeSelect').value = cachedSettings.theme;
+                        applyTheme(cachedSettings.theme);
+                    }
+                    if(cachedSettings.music_enabled !== undefined) {
+                        const enabled = cachedSettings.music_enabled === 'true';
+                        document.getElementById('musicToggle').checked = enabled;
+                        document.getElementById('urlFormContainer').classList.toggle('hidden', !enabled);
+                    }
+                    if(cachedSettings.streak) {
+                        document.getElementById('streakCounter').textContent = `${cachedSettings.streak} 🔥`;
+                    }
+                }
+            } catch (e) {
+                console.error("Error loading settings", e);
+            }
+        }
+
+        async function saveSetting(key, value) {
+            if(!userId) return;
+            cachedSettings[key] = value;
+            try {
+                // <-- WRITE to Firestore
+                await setDoc(doc(getSettingsRef(), 'config'), cachedSettings, { merge: true });
+            } catch(e) {
+                console.error("Save setting failed", e);
+            }
+        }
+
+        async function loadFromFirestore() {
+            if(!userId) return;
+            
+            // 1. Fetch Sessions for Stats
+            // <-- READ from Firestore
+            const sessionsSnap = await getDocs(getSessionsRef());
+            let totalMins = 0;
+            const sessionData = [];
+            
+            sessionsSnap.forEach(doc => {
+                const data = doc.data();
+                totalMins += (data.duration || 0);
+                sessionData.push(data);
+            });
+
+            const h = Math.floor(totalMins / 60);
+            const m = totalMins % 60;
+            document.getElementById('totalFocus').textContent = `${h}h ${m}m`;
+
+            renderGitHubGraph(sessionData);
+            
+            // 2. Fetch Tasks & Subtasks
+            renderTasks();
+        }
+
+        // -------------------- Task Logic (Window Attached) --------------------
+        
+        window.toggleAddTask = () => {
+             resetForm();
+             document.getElementById('addTaskForm').classList.remove('hidden');
+        };
+        
+        document.getElementById('toggleAddTask').addEventListener('click', window.toggleAddTask);
+        
+        document.getElementById('cancelAddTask').addEventListener('click', () => {
+            document.getElementById('addTaskForm').classList.add('hidden');
             resetForm();
         });
 
         function resetForm() {
             document.getElementById('newTaskTitle').value = '';
             document.getElementById('newTaskEst').value = '1';
-            saveTaskBtn.textContent = 'SAVE';
-            formTitle.textContent = 'ADD NEW TASK';
+            document.getElementById('saveTask').textContent = 'SAVE';
+            document.getElementById('formTitle').textContent = 'ADD NEW TASK';
             editingTaskId = null;
         }
 
-        saveTaskBtn.addEventListener('click', () => {
+        document.getElementById('saveTask').addEventListener('click', async () => {
             const title = document.getElementById('newTaskTitle').value;
             const est = document.getElementById('newTaskEst').value;
-            if(!title) return;
+            if(!title || !userId) return;
 
             if (editingTaskId) {
-                // Update existing task
-                db.run("UPDATE tasks SET title = ?, est_pomodoros = ? WHERE id = ?", [title, est, editingTaskId]);
+                // <-- WRITE to Firestore (Update)
+                await updateDoc(doc(getTasksRef(), editingTaskId), {
+                    title: title,
+                    est_pomodoros: parseInt(est)
+                });
                 showSnackbar("Task updated!", "success");
             } else {
-                // Create new task
-                db.run("INSERT INTO tasks (title, est_pomodoros, created_at) VALUES (?, ?, ?)", [title, est, Date.now()]);
+                // <-- WRITE to Firestore (Create)
+                await addDoc(getTasksRef(), {
+                    title: title,
+                    est_pomodoros: parseInt(est),
+                    act_pomodoros: 0,
+                    is_completed: 0,
+                    is_active: 0,
+                    created_at: Date.now()
+                });
             }
-            saveDB();
-            addTaskForm.classList.add('hidden');
+            document.getElementById('addTaskForm').classList.add('hidden');
             resetForm();
             renderTasks();
         });
 
-        window.editTask = (id) => {
-             if(!db) return;
-             // Get task details
-             const stmt = db.prepare("SELECT * FROM tasks WHERE id = ?");
-             stmt.bind([id]);
-             if (stmt.step()) {
-                 const task = stmt.getAsObject();
+        window.editTask = async (id) => {
+             if(!userId) return;
+             // <-- READ from Firestore
+             const docSnap = await getDoc(doc(getTasksRef(), id));
+             if (docSnap.exists()) {
+                 const task = docSnap.data();
                  document.getElementById('newTaskTitle').value = task.title;
                  document.getElementById('newTaskEst').value = task.est_pomodoros;
                  
                  editingTaskId = id;
-                 saveTaskBtn.textContent = 'UPDATE';
-                 formTitle.textContent = 'EDIT TASK';
-                 addTaskForm.classList.remove('hidden');
-                 // Scroll to form
-                 addTaskForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                 document.getElementById('saveTask').textContent = 'UPDATE';
+                 document.getElementById('formTitle').textContent = 'EDIT TASK';
+                 document.getElementById('addTaskForm').classList.remove('hidden');
+                 document.getElementById('addTaskForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
              }
-             stmt.free();
         };
 
-        function renderTasks() {
-            if (!db) return;
-            const tasks = [];
-            const stmt = db.prepare("SELECT * FROM tasks ORDER BY is_completed ASC, created_at DESC");
-            while(stmt.step()) tasks.push(stmt.getAsObject());
-            stmt.free();
-
-            taskListEl.innerHTML = '';
+        async function renderTasks() {
+            if (!userId) return;
             
-            // Check for Active Task
+            // <-- READ from Firestore
+            const tasksSnap = await getDocs(getTasksRef());
+            let tasks = [];
+            tasksSnap.forEach(doc => tasks.push({id: doc.id, ...doc.data()}));
+            
+            tasks.sort((a, b) => {
+                if (a.is_completed !== b.is_completed) return a.is_completed - b.is_completed;
+                return b.created_at - a.created_at;
+            });
+
+            // <-- READ from Firestore
+            const subSnap = await getDocs(getSubtasksRef());
+            const allSubtasks = [];
+            subSnap.forEach(doc => allSubtasks.push({id: doc.id, ...doc.data()}));
+
+            const listEl = document.getElementById('taskList');
+            listEl.innerHTML = '';
+            
             const activeTask = tasks.find(t => t.is_active === 1 && t.is_completed === 0);
             if(activeTask) {
-                currentTaskDisplay.classList.remove('hidden');
-                currentTaskTitle.textContent = activeTask.title;
+                document.getElementById('currentTaskDisplay').classList.remove('hidden');
+                document.getElementById('currentTaskTitle').textContent = activeTask.title;
             } else {
-                currentTaskDisplay.classList.add('hidden');
+                document.getElementById('currentTaskDisplay').classList.add('hidden');
             }
 
             if(tasks.length === 0) {
-                taskListEl.innerHTML = '<div class="text-center text-gray-500 py-4 italic text-sm">No tasks yet. Add one to get started!</div>';
+                listEl.innerHTML = '<div class="text-center text-gray-500 py-4 italic text-sm">No tasks yet. Add one to get started!</div>';
                 return;
             }
 
             tasks.forEach(task => {
-                // Fetch subtasks for this task
-                const subtasks = [];
-                const subStmt = db.prepare("SELECT * FROM subtasks WHERE parent_task_id = ? ORDER BY created_at ASC");
-                subStmt.bind([task.id]);
-                while(subStmt.step()) subtasks.push(subStmt.getAsObject());
-                subStmt.free();
-
+                const subtasks = allSubtasks.filter(s => s.parent_task_id === task.id).sort((a,b) => a.created_at - b.created_at);
                 const completedSubtasks = subtasks.filter(s => s.is_completed).length;
                 const progressPct = subtasks.length > 0 ? (completedSubtasks / subtasks.length) * 100 : 0;
 
@@ -677,11 +688,11 @@
                 subtasks.forEach(sub => {
                     subtasksHtml += `
                         <div class="flex items-center gap-2 py-1 ml-4 subtask-line">
-                             <button onclick="toggleSubtaskComplete(${sub.id}, ${sub.is_completed}, ${task.id})" class="text-gray-400 hover:text-green-500 p-1">
+                             <button onclick="toggleSubtaskComplete('${sub.id}', ${sub.is_completed})" class="text-gray-400 hover:text-green-500 p-1">
                                 <i data-lucide="${sub.is_completed ? 'check-square' : 'square'}" class="w-4 h-4 ${sub.is_completed ? 'text-green-500' : ''}"></i>
                              </button>
                              <span class="text-xs ${sub.is_completed ? 'line-through text-gray-400' : 'text-gray-600 dark:text-gray-300'}">${sub.title}</span>
-                             <button onclick="deleteSubtask(${sub.id}, ${task.id})" class="ml-auto text-gray-400 hover:text-red-400 p-1">
+                             <button onclick="deleteSubtask('${sub.id}')" class="ml-auto text-gray-400 hover:text-red-400 p-1">
                                 <i data-lucide="x" class="w-3 h-3"></i>
                              </button>
                         </div>
@@ -690,8 +701,8 @@
 
                 el.innerHTML = `
                     <div class="p-3 flex items-start gap-3 group relative">
-                        <div class="flex items-center gap-3 flex-1 cursor-pointer" onclick="setActiveTask(${task.id})">
-                            <button class="text-gray-400 hover:text-green-500 mt-1 p-1" onclick="event.stopPropagation(); toggleTaskComplete(${task.id}, ${task.is_completed})">
+                        <div class="flex items-center gap-3 flex-1 cursor-pointer" onclick="setActiveTask('${task.id}')">
+                            <button class="text-gray-400 hover:text-green-500 mt-1 p-1" onclick="event.stopPropagation(); toggleTaskComplete('${task.id}', ${task.is_completed})">
                                 <i data-lucide="${task.is_completed ? 'check-circle-2' : 'circle'}" class="w-5 h-5 ${task.is_completed ? 'text-green-500 fill-green-500/20' : ''}"></i>
                             </button>
                             <div class="flex-1 overflow-hidden">
@@ -708,13 +719,13 @@
                                 <span class="text-base sm:text-lg">${task.act_pomodoros}</span>/<span class="text-xs sm:text-sm">${task.est_pomodoros}</span>
                             </div>
                             <div class="flex items-center gap-1">
-                                <button class="text-gray-400 hover:text-blue-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); toggleSubtaskInput(${task.id})" title="Add Subtask">
+                                <button class="text-gray-400 hover:text-blue-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); toggleSubtaskInput('${task.id}')" title="Add Subtask">
                                     <i data-lucide="list-plus" class="w-4 h-4"></i>
                                 </button>
-                                <button class="text-gray-400 hover:text-yellow-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); editTask(${task.id})" title="Edit Task">
+                                <button class="text-gray-400 hover:text-yellow-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); editTask('${task.id}')" title="Edit Task">
                                     <i data-lucide="pencil" class="w-4 h-4"></i>
                                 </button>
-                                <button class="text-gray-400 hover:text-red-500 transition-opacity p-1" onclick="event.stopPropagation(); deleteTask(${task.id})" title="Delete Task">
+                                <button class="text-gray-400 hover:text-red-500 transition-opacity p-1" onclick="event.stopPropagation(); deleteTask('${task.id}')" title="Delete Task">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
                             </div>
@@ -728,13 +739,90 @@
                     <div id="add-subtask-form-${task.id}" class="hidden px-3 pb-3 pt-1 border-t border-gray-100 dark:border-gray-700/50">
                         <div class="flex gap-2">
                             <input type="text" id="subtask-input-${task.id}" placeholder="Subtask name..." class="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-green-500">
-                            <button onclick="addSubtask(${task.id})" class="px-2 py-1 bg-green-500 text-white rounded text-xs">Add</button>
+                            <button onclick="addSubtask('${task.id}')" class="px-2 py-1 bg-green-500 text-white rounded text-xs">Add</button>
                         </div>
                     </div>
                 `;
-                taskListEl.appendChild(el);
+                listEl.appendChild(el);
             });
             lucide.createIcons();
+        }
+
+        window.toggleSubtaskInput = (taskId) => {
+            const form = document.getElementById(`add-subtask-form-${taskId}`);
+            form.classList.toggle('hidden');
+        };
+
+        window.addSubtask = async (taskId) => {
+            const input = document.getElementById(`subtask-input-${taskId}`);
+            const title = input.value;
+            if(!title) return;
+            
+            // <-- WRITE to Firestore
+            await addDoc(getSubtasksRef(), {
+                parent_task_id: taskId,
+                title: title,
+                is_completed: 0,
+                created_at: Date.now()
+            });
+            renderTasks();
+        };
+
+        window.deleteSubtask = async (subId) => {
+            // <-- WRITE to Firestore
+            await deleteDoc(doc(getSubtasksRef(), subId));
+            renderTasks();
+        };
+
+        window.toggleSubtaskComplete = async (subId, currentStatus) => {
+            const newStatus = currentStatus ? 0 : 1;
+            // <-- WRITE to Firestore
+            await updateDoc(doc(getSubtasksRef(), subId), { is_completed: newStatus });
+            renderTasks();
+        };
+
+        window.setActiveTask = async (id) => {
+            const snapshot = await getDocs(getTasksRef());
+            const batchPromises = [];
+            
+            snapshot.forEach(d => {
+                if(d.data().is_active === 1) {
+                    batchPromises.push(updateDoc(doc(getTasksRef(), d.id), { is_active: 0 }));
+                }
+            });
+            await Promise.all(batchPromises);
+            
+            // <-- WRITE to Firestore
+            await updateDoc(doc(getTasksRef(), id), { is_active: 1 });
+            renderTasks();
+        };
+
+        window.toggleTaskComplete = async (id, currentStatus) => {
+            const newStatus = currentStatus ? 0 : 1;
+            const completedAt = newStatus === 1 ? Date.now() : null;
+            // <-- WRITE to Firestore
+            await updateDoc(doc(getTasksRef(), id), {
+                is_completed: newStatus,
+                is_active: 0,
+                completed_at: completedAt
+            });
+            renderTasks();
+        };
+
+        window.deleteTask = async (id) => {
+            if(confirm("Delete this task and all its subtasks?")) {
+                // <-- WRITE to Firestore
+                await deleteDoc(doc(getTasksRef(), id));
+                const subSnap = await getDocs(getSubtasksRef()); 
+                const subDeletes = [];
+                subSnap.forEach(d => {
+                    if(d.data().parent_task_id === id) {
+                        subDeletes.push(deleteDoc(doc(getSubtasksRef(), d.id)));
+                    }
+                });
+                await Promise.all(subDeletes);
+                renderTasks();
+            }
         }
 
         // -------------------- Sync Logic --------------------
@@ -747,28 +835,36 @@
         toggleSyncBtn.addEventListener('click', () => syncModal.classList.remove('hidden'));
         closeSyncBtn.addEventListener('click', () => syncModal.classList.add('hidden'));
 
-        importTasksBtn.addEventListener('click', () => {
+        importTasksBtn.addEventListener('click', async () => {
             const text = document.getElementById('importText').value;
             if(!text) return;
             const lines = text.split('\n').filter(line => line.trim() !== '');
             
-            lines.forEach(line => {
-                db.run("INSERT INTO tasks (title, est_pomodoros, created_at) VALUES (?, ?, ?)", [line.trim(), 1, Date.now()]);
-            });
+            // <-- WRITE (Batch) to Firestore
+            const promises = lines.map(line => addDoc(getTasksRef(), {
+                title: line.trim(),
+                est_pomodoros: 1,
+                act_pomodoros: 0,
+                is_completed: 0,
+                is_active: 0,
+                created_at: Date.now()
+            }));
             
-            saveDB();
+            await Promise.all(promises);
             renderTasks();
             document.getElementById('importText').value = '';
             syncModal.classList.add('hidden');
             showSnackbar(`Imported ${lines.length} tasks!`, "success");
         });
 
-        copyToRemindersBtn.addEventListener('click', () => {
-            if(!db) return;
+        copyToRemindersBtn.addEventListener('click', async () => {
+            if(!userId) return;
+            const snapshot = await getDocs(getTasksRef());
             const tasks = [];
-            const stmt = db.prepare("SELECT title FROM tasks WHERE is_completed = 0");
-            while(stmt.step()) tasks.push(stmt.getAsObject().title);
-            stmt.free();
+            snapshot.forEach(d => {
+                const data = d.data();
+                if(data.is_completed === 0) tasks.push(data.title);
+            });
 
             if(tasks.length === 0) {
                  showSnackbar("No active tasks to copy.", "info");
@@ -781,182 +877,16 @@
             });
         });
 
-        window.toggleSubtaskInput = (taskId) => {
-            const form = document.getElementById(`add-subtask-form-${taskId}`);
-            const container = document.getElementById(`subtask-container-${taskId}`);
-            form.classList.toggle('hidden');
+        // -------------------- Global State & Timer --------------------
+        let timerState = {
+            intervalID: null,
+            totalSeconds: 0,
+            remainingSeconds: 0,
+            isPaused: false,
+            mode: "focus",
+            endTime: null 
         };
 
-        window.addSubtask = (taskId) => {
-            const input = document.getElementById(`subtask-input-${taskId}`);
-            const title = input.value;
-            if(!title) return;
-            
-            db.run("INSERT INTO subtasks (parent_task_id, title, created_at) VALUES (?, ?, ?)", [taskId, title, Date.now()]);
-            saveDB();
-            renderTasks();
-        };
-
-        window.deleteSubtask = (subId, taskId) => {
-            db.run("DELETE FROM subtasks WHERE id = ?", [subId]);
-            saveDB();
-            renderTasks();
-        };
-
-        window.toggleSubtaskComplete = (subId, currentStatus, taskId) => {
-            const newStatus = currentStatus ? 0 : 1;
-            db.run("UPDATE subtasks SET is_completed = ? WHERE id = ?", [newStatus, subId]);
-            saveDB();
-            renderTasks();
-        };
-
-        window.setActiveTask = (id) => {
-            // Unset all active
-            db.run("UPDATE tasks SET is_active = 0");
-            // Set new active
-            db.run("UPDATE tasks SET is_active = 1 WHERE id = ?", [id]);
-            saveDB();
-            renderTasks();
-        };
-
-        window.toggleTaskComplete = (id, currentStatus) => {
-            const newStatus = currentStatus ? 0 : 1;
-            const completedAt = newStatus === 1 ? Date.now() : null;
-            db.run("UPDATE tasks SET is_completed = ?, is_active = 0, completed_at = ? WHERE id = ?", [newStatus, completedAt, id]);
-            saveDB();
-            renderTasks();
-        };
-
-        window.deleteTask = (id) => {
-            if(confirm("Delete this task and all its subtasks?")) {
-                db.run("DELETE FROM tasks WHERE id = ?", [id]);
-                db.run("DELETE FROM subtasks WHERE parent_task_id = ?", [id]);
-                saveDB();
-                renderTasks();
-            }
-        }
-
-        // -------------------- Stats & Graph --------------------
-        function loadFromDB() {
-            if (!db) return;
-            
-            // Total Focus
-            const resTotal = db.exec("SELECT SUM(duration) as total FROM focus_sessions");
-            const totalMins = resTotal[0]?.values[0][0] || 0;
-            const h = Math.floor(totalMins / 60);
-            const m = totalMins % 60;
-            document.getElementById('totalFocus').textContent = `${h}h ${m}m`;
-
-            // Streak
-            const streak = getSetting('streak') || 0;
-            document.getElementById('streakCounter').textContent = `${streak} 🔥`;
-
-            // Render GitHub Graph
-            renderGitHubGraph();
-            renderTasks();
-
-            // Music Setting
-            const musicEnabled = getSetting('music_enabled') === 'true';
-            document.getElementById('musicToggle').checked = musicEnabled;
-            if (musicEnabled) document.getElementById('urlFormContainer').classList.remove('hidden');
-        }
-
-        function renderGitHubGraph() {
-            if (!db) return;
-            const graphEl = document.getElementById('githubGraph');
-            graphEl.innerHTML = '';
-
-            // 1. Get all session data
-            const dataMap = {};
-            const stmt = db.prepare("SELECT date, SUM(duration) as mins FROM focus_sessions GROUP BY date");
-            while(stmt.step()) {
-                const row = stmt.getAsObject();
-                dataMap[row.date] = row.mins;
-            }
-            stmt.free();
-
-            // 2. Generate dates for last 365 days
-            const today = new Date();
-            const totalDays = 365; // Approx
-            const startDate = new Date();
-            startDate.setDate(today.getDate() - totalDays);
-
-            // Normalize start to align somewhat
-            const startDay = startDate.getDay(); 
-            const daysToSubtract = startDay === 0 ? 6 : startDay - 1; // Mon=0
-            startDate.setDate(startDate.getDate() - daysToSubtract);
-            
-            let currentDate = new Date(startDate);
-            
-            // Generate cells
-            while (currentDate <= today) {
-                const dateStr = currentDate.toISOString().slice(0, 10);
-                const mins = dataMap[dateStr] || 0;
-                
-                // Color Logic
-                let colorClass = 'bg-gray-200 dark:bg-gray-800';
-                if (mins > 0) colorClass = 'bg-green-200';
-                if (mins > 30) colorClass = 'bg-green-300';
-                if (mins > 60) colorClass = 'bg-green-400';
-                if (mins > 120) colorClass = 'bg-green-500';
-                if (mins > 240) colorClass = 'bg-green-900';
-
-                const cell = document.createElement('div');
-                cell.className = `contrib-cell ${colorClass} relative group`;
-                
-                // Tooltip
-                const tooltip = document.createElement('div');
-                tooltip.className = 'absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none hidden sm:block';
-                tooltip.innerHTML = `<strong>${mins}m</strong> on ${new Date(dateStr).toLocaleDateString(undefined, {month:'short', day:'numeric'})}`;
-                
-                cell.appendChild(tooltip);
-                graphEl.appendChild(cell);
-
-                currentDate.setDate(currentDate.getDate() + 1);
-            }
-        }
-
-        // -------------------- Timer & Session Logic --------------------
-        function logSession(duration) {
-            if (!db) return;
-            const today = new Date().toISOString().slice(0, 10);
-            const timestamp = Date.now();
-            
-            // Find active task
-            const stmt = db.prepare("SELECT id, act_pomodoros FROM tasks WHERE is_active = 1 LIMIT 1");
-            let taskId = null;
-            if(stmt.step()) {
-                const task = stmt.getAsObject();
-                taskId = task.id;
-                // Update task progress
-                db.run("UPDATE tasks SET act_pomodoros = ? WHERE id = ?", [task.act_pomodoros + 1, task.id]);
-            }
-            stmt.free();
-
-            db.run("INSERT INTO focus_sessions (date, duration, timestamp, task_id) VALUES (?, ?, ?, ?)", [today, duration, timestamp, taskId]);
-            
-            // Streak Logic
-            const lastDate = getSetting('last_session_date');
-            let currentStreak = parseInt(getSetting('streak') || 0);
-            
-            if (lastDate !== today) {
-                const yesterday = new Date();
-                yesterday.setDate(yesterday.getDate() - 1);
-                const yesterdayStr = yesterday.toISOString().slice(0, 10);
-                
-                if (lastDate === yesterdayStr) {
-                    currentStreak++;
-                } else {
-                    currentStreak = 1;
-                }
-                setSetting('streak', currentStreak);
-                setSetting('last_session_date', today);
-            }
-            saveDB();
-            loadFromDB(); // Refresh UI
-        }
-
-        // -------------------- Standard Timer Functions --------------------
         const timerDisplay = document.getElementById('timerDisplay');
         const timerRing = document.getElementById('timerRing');
         const tree = document.getElementById('treeContainer');
@@ -971,7 +901,7 @@
         const musicPlayerContainer = document.getElementById('musicPlayer');
         const youtubePlayer = document.getElementById('youtubePlayer');
         const closeMusicPlayerBtn = document.getElementById('closeMusicPlayer');
-        const endSound = new Audio('https://actions.google.com/sounds/v1/alerts/beep.ogg');
+        const endSound = new Audio('https://upload.wikimedia.org/wikipedia/commons/3/34/Sound_Effect_-_Notifications_01.ogg');
 
         function updateTimerDisplay(seconds, totalSeconds) {
             const mins = Math.floor(seconds / 60);
@@ -996,7 +926,6 @@
             }
         }
 
-        // Common timer loop logic
         function startTimerLoop() {
              clearInterval(timerState.intervalID);
              timerState.intervalID = setInterval(() => {
@@ -1017,14 +946,12 @@
             }, 1000);
         }
 
-        function startTimer(durationMinutes, mode) {
+        window.startTimer = (durationMinutes, mode) => {
             clearInterval(timerState.intervalID);
             timerState.mode = mode;
             timerState.totalSeconds = durationMinutes * 60;
             timerState.remainingSeconds = timerState.totalSeconds;
             timerState.isPaused = false;
-            
-            // Set Target Time
             timerState.endTime = Date.now() + (timerState.totalSeconds * 1000);
             
             modeLabel.textContent = mode === "focus" ? "Focus Session" : "Break Time";
@@ -1050,34 +977,30 @@
 
             updateTimerDisplay(timerState.remainingSeconds, timerState.totalSeconds);
             startTimerLoop();
-        }
+        };
 
-        function pauseTimer() {
+        window.pauseTimer = () => {
             timerState.isPaused = true;
             clearInterval(timerState.intervalID);
             pauseButton.textContent = 'Resume';
             pauseIcon.classList.remove('hidden');
             tree.classList.add('hidden');
             document.title = "Paused - Pomodoro";
-        }
+        };
 
-        function resumeTimer() {
+        window.resumeTimer = () => {
             timerState.isPaused = false;
             pauseButton.textContent = 'Pause';
             pauseIcon.classList.add('hidden');
             tree.classList.remove('hidden');
-            
-            // Recalculate End Time based on remaining
             timerState.endTime = Date.now() + (timerState.remainingSeconds * 1000);
-            
             startTimerLoop();
-        }
+        };
 
-        function resetTimer() {
+        window.resetTimer = () => {
             clearInterval(timerState.intervalID);
             timerState.isPaused = false;
             timerState.intervalID = null; 
-            
             timerState.mode = "focus";
             const defaultTime = parseInt(focusSelect.value);
             
@@ -1099,24 +1022,118 @@
             timerRing.classList.add('stroke-green-500');
             stopBreakMusic();
             document.title = "Pomodoro Focus App";
-        }
+        };
 
-        function handleSessionEnd() {
+        async function handleSessionEnd() {
             clearInterval(timerState.intervalID);
             endSound.play().catch(e => console.log("Audio needed user interaction:", e));
             
             if (timerState.mode === "focus") {
                 const completedTime = parseInt(focusSelect.value);
-                logSession(completedTime);
+                
+                if(userId) {
+                    const snapshot = await getDocs(getTasksRef());
+                    let activeTaskId = null;
+                    let currentAct = 0;
+                    snapshot.forEach(d => {
+                        const t = d.data();
+                        if(t.is_active === 1) {
+                            activeTaskId = d.id;
+                            currentAct = t.act_pomodoros || 0;
+                        }
+                    });
+
+                    // <-- WRITE to Firestore
+                    await addDoc(getSessionsRef(), {
+                        date: new Date().toISOString().slice(0, 10),
+                        duration: completedTime,
+                        timestamp: Date.now(),
+                        task_id: activeTaskId
+                    });
+
+                    if(activeTaskId) {
+                        // <-- WRITE to Firestore
+                        await updateDoc(doc(getTasksRef(), activeTaskId), { act_pomodoros: currentAct + 1 });
+                    }
+                    
+                    const today = new Date().toISOString().slice(0, 10);
+                    const lastDate = cachedSettings.last_session_date;
+                    let streak = parseInt(cachedSettings.streak || 0);
+                    
+                    if (lastDate !== today) {
+                        const yesterday = new Date();
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        const yesterdayStr = yesterday.toISOString().slice(0, 10);
+                        
+                        if (lastDate === yesterdayStr) {
+                            streak++;
+                        } else {
+                            streak = 1;
+                        }
+                        saveSetting('streak', streak);
+                        saveSetting('last_session_date', today);
+                        document.getElementById('streakCounter').textContent = `${streak} 🔥`;
+                    }
+                    loadFromFirestore();
+                }
+
                 showSnackbar("Focus session complete!", "success");
-                startTimer(parseInt(breakSelect.value), "break");
+                window.startTimer(parseInt(breakSelect.value), "break");
             } else {
                 showSnackbar("Break over! Ready to focus?", "info");
-                resetTimer();
+                window.resetTimer();
             }
         }
 
-        // Music Utils
+        // Attach listeners
+        startButton.addEventListener('click', () => window.startTimer(parseInt(focusSelect.value), "focus"));
+        pauseButton.addEventListener('click', () => { if(timerState.isPaused) window.resumeTimer(); else window.pauseTimer(); });
+        resetButton.addEventListener('click', window.resetTimer);
+        skipBreakButton.addEventListener('click', () => { stopBreakMusic(); window.resetTimer(); });
+        focusSelect.addEventListener('change', () => { if(!timerState.intervalID) updateTimerDisplay(focusSelect.value * 60, focusSelect.value * 60); });
+
+        function renderGitHubGraph(sessionData) {
+            const graphEl = document.getElementById('githubGraph');
+            graphEl.innerHTML = '';
+
+            const dataMap = {};
+            sessionData.forEach(s => {
+                dataMap[s.date] = (dataMap[s.date] || 0) + (s.duration || 0);
+            });
+
+            const today = new Date();
+            const totalDays = 365;
+            const startDate = new Date();
+            startDate.setDate(today.getDate() - totalDays);
+            const startDay = startDate.getDay(); 
+            const daysToSubtract = startDay === 0 ? 6 : startDay - 1; 
+            startDate.setDate(startDate.getDate() - daysToSubtract);
+            
+            let currentDate = new Date(startDate);
+            while (currentDate <= today) {
+                const dateStr = currentDate.toISOString().slice(0, 10);
+                const mins = dataMap[dateStr] || 0;
+                let colorClass = 'bg-gray-200 dark:bg-gray-800';
+                if (mins > 0) colorClass = 'bg-green-200';
+                if (mins > 30) colorClass = 'bg-green-300';
+                if (mins > 60) colorClass = 'bg-green-400';
+                if (mins > 120) colorClass = 'bg-green-500';
+                if (mins > 240) colorClass = 'bg-green-900';
+
+                const cell = document.createElement('div');
+                cell.className = `contrib-cell ${colorClass} relative group`;
+                
+                const tooltip = document.createElement('div');
+                tooltip.className = 'absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none hidden sm:block';
+                tooltip.innerHTML = `<strong>${mins}m</strong> on ${new Date(dateStr).toLocaleDateString(undefined, {month:'short', day:'numeric'})}`;
+                
+                cell.appendChild(tooltip);
+                graphEl.appendChild(cell);
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+        }
+
+        // --- Music Utils ---
         function getEmbedUrl(url) {
             if (!url) return null;
             const origin = window.location.origin;
@@ -1136,7 +1153,7 @@
         function playBreakMusic() {
             if (document.getElementById('musicToggle').checked === false || !youtubePlayer) return;
             musicPlayerContainer.classList.remove('translate-y-[150%]');
-            const storedUrl = getSetting('customMusicUrl');
+            const storedUrl = cachedSettings.custom_music_url;
             const origin = window.location.origin;
             let embedUrl = `https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1&enablejsapi=1&origin=${origin}`;
             if (storedUrl) {
@@ -1152,19 +1169,12 @@
             youtubePlayer.src = "";
         }
 
-        // Listeners
-        startButton.addEventListener('click', () => startTimer(parseInt(focusSelect.value), "focus"));
-        pauseButton.addEventListener('click', () => { if(timerState.isPaused) resumeTimer(); else pauseTimer(); });
-        resetButton.addEventListener('click', resetTimer);
-        skipBreakButton.addEventListener('click', () => { stopBreakMusic(); resetTimer(); });
-        focusSelect.addEventListener('change', () => { if(!timerState.intervalID) updateTimerDisplay(focusSelect.value * 60, focusSelect.value * 60); });
-        
         document.getElementById('urlForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const url = document.getElementById('videoUrl').value;
             const embedUrl = getEmbedUrl(url);
             if (embedUrl) {
-                setSetting('customMusicUrl', url);
+                saveSetting('custom_music_url', url);
                 showSnackbar("Break music URL saved!", "success");
                 document.getElementById('videoUrl').value = "";
             } else showSnackbar("Invalid YouTube URL", "error");
@@ -1172,7 +1182,7 @@
 
         document.getElementById('musicToggle').addEventListener('change', (e) => {
             const isEnabled = e.target.checked;
-            setSetting('music_enabled', isEnabled.toString());
+            saveSetting('music_enabled', isEnabled.toString());
             document.getElementById('urlFormContainer').classList.toggle('hidden', !isEnabled);
         });
 
@@ -1180,9 +1190,13 @@
 
         document.getElementById('themeSelect').addEventListener('change', () => {
             const theme = document.getElementById('themeSelect').value;
-            setSetting('theme', theme);
-            document.documentElement.className = theme === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : '') : theme;
+            saveSetting('theme', theme);
+            applyTheme(theme);
         });
+
+        function applyTheme(theme) {
+             document.documentElement.className = theme === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : '') : theme;
+        }
 
         function showSnackbar(message, type = "info") {
             const snackbar = document.getElementById('snackbar');
@@ -1194,12 +1208,8 @@
                 snackbar.classList.add('opacity-0');
             }, 3000);
         }
-
-        // Init
-        window.addEventListener('DOMContentLoaded', () => {
-            initDB();
-            updateTimerDisplay(focusSelect.value * 60, focusSelect.value * 60);
-        });
+        
+        updateTimerDisplay(focusSelect.value * 60, focusSelect.value * 60);
     </script>
   </body>
 </html>
