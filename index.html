@@ -1247,7 +1247,51 @@
         const musicPlayerContainer = document.getElementById('musicPlayer');
         const youtubePlayer = document.getElementById('youtubePlayer');
         const closeMusicPlayerBtn = document.getElementById('closeMusicPlayer');
-        const endSound = new Audio('https://upload.wikimedia.org/wikipedia/commons/3/34/Sound_Effect_-_Notifications_01.ogg');
+        
+        // --- SYNTHESIZED SCHOOL BELL (No external files needed) ---
+        function playSchoolBell() {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            
+            const ctx = new AudioContext();
+            const t = ctx.currentTime;
+            
+            // Create main oscillator (the "tone")
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            
+            // 'Square' wave creates a harsh, buzzy sound like an electric bell
+            osc.type = 'square'; 
+            osc.frequency.setValueAtTime(650, t); 
+            
+            // Create LFO (Low Frequency Oscillator) to make it "rattle" or "ring"
+            // This modulates the frequency rapidly (20 times per second)
+            const lfo = ctx.createOscillator();
+            lfo.type = 'sawtooth';
+            lfo.frequency.value = 20; 
+            
+            const lfoGain = ctx.createGain();
+            lfoGain.gain.value = 200; // How much the pitch wobbles
+            
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            
+            // Connect to output
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            
+            // Envelope (Volume control)
+            gain.gain.setValueAtTime(0.0, t);
+            gain.gain.linearRampToValueAtTime(0.1, t + 0.1); // Attack
+            gain.gain.setValueAtTime(0.1, t + 2.0); // Sustain
+            gain.gain.linearRampToValueAtTime(0.0, t + 2.5); // Release
+            
+            // Start/Stop
+            osc.start(t);
+            lfo.start(t);
+            osc.stop(t + 2.5);
+            lfo.stop(t + 2.5);
+        }
 
         function saveLocalState() {
             localStorage.setItem('pomodoroTimer', JSON.stringify({
@@ -1450,7 +1494,13 @@
         async function handleSessionEnd() {
             clearInterval(timerState.intervalID);
             localStorage.removeItem('pomodoroTimer');
-            endSound.play().catch(e => console.log("Audio needed user interaction:", e));
+            
+            // Play the synthesized bell
+            try {
+                playSchoolBell();
+            } catch(e) {
+                console.error("Audio error:", e);
+            }
             
             if (timerState.mode === "focus") {
                 const completedTime = parseInt(focusSelect.value);
