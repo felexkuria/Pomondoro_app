@@ -668,6 +668,9 @@
         
         const getTasksRef = () => collection(db, 'artifacts', appId, 'users', userId, 'tasks');
         const getTaskSubtasksRef = (taskId) => collection(db, 'artifacts', appId, 'users', userId, 'tasks', taskId, 'subtasks');
+        // NEW: Nested sub-items for KRs (stored as an array inside the KR document for simplicity, or a sub-collection)
+        // Let's stick to the subtasks collection but add a 'parent_kr_id' field for nesting.
+        
         const getSessionsRef = () => collection(db, 'artifacts', appId, 'users', userId, 'focus_sessions');
         const getSettingsRef = () => collection(db, 'artifacts', appId, 'users', userId, 'settings');
 
@@ -949,6 +952,12 @@
                 kpiFields.classList.remove('flex');
             }
         };
+        
+        // Toggle visibility of KR sub-items input
+        window.toggleKrSubInput = (krId) => {
+            const form = document.getElementById(`add-kr-sub-form-${krId}`);
+            if(form) form.classList.toggle('hidden');
+        };
 
         // Update KPI Value in Firestore
         window.updateKPI = async (subId, taskId, newValue) => {
@@ -1007,22 +1016,31 @@
             }
 
             tasks.forEach(task => {
-                const subtasks = task.subtasks || [];
-                const completedSubtasks = subtasks.filter(s => s.is_completed).length;
+                const allItems = task.subtasks || [];
                 
-                // For main progress bar: only count KRs and Roadmap items (checkboxes)
-                const checkableItems = subtasks.filter(s => s.category !== 'kpi');
-                const checkedItems = checkableItems.filter(s => s.is_completed).length;
-                const progressPct = checkableItems.length > 0 ? (checkedItems / checkableItems.length) * 100 : 0;
+                // Separate items by type
+                const kpis = allItems.filter(s => s.category === 'kpi');
+                const roadmaps = allItems.filter(s => s.category === 'roadmap' || !s.category);
+                
+                // Key Results handling:
+                // 1. Get Top-Level KRs (those without a parent_kr_id)
+                const mainKRs = allItems.filter(s => s.category === 'kr' && !s.parent_kr_id);
+                
+                // 2. Map sub-steps to their parents
+                const krSubSteps = {};
+                allItems.filter(s => s.parent_kr_id).forEach(step => {
+                    if(!krSubSteps[step.parent_kr_id]) krSubSteps[step.parent_kr_id] = [];
+                    krSubSteps[step.parent_kr_id].push(step);
+                });
+
+                // Calculate progress
+                const checkableItems = allItems.filter(s => s.category !== 'kpi');
+                const completedItems = checkableItems.filter(s => s.is_completed).length;
+                const progressPct = checkableItems.length > 0 ? (completedItems / checkableItems.length) * 100 : 0;
                 
                 const totalMinutes = task.total_minutes || 0;
                 const timeDisplay = formatMinutes(totalMinutes);
                 
-                // Group subtasks
-                const kpis = subtasks.filter(s => s.category === 'kpi');
-                const krs = subtasks.filter(s => s.category === 'kr');
-                const roadmap = subtasks.filter(s => s.category === 'roadmap' || !s.category);
-
                 // --- RENDERERS ---
                 
                 const renderKPIs = (items) => {
@@ -1035,10 +1053,9 @@
                         const unit = sub.unit || '';
                         const pct = Math.min(100, Math.max(0, (current / target) * 100));
                         
-                        // Color logic for KPI
                         let colorClass = 'bg-blue-500';
                         if(pct >= 100) colorClass = 'bg-green-500';
-                        else if(pct < 40) colorClass = 'bg-red-500'; // "Red" if below 40% per Google OKR notes
+                        else if(pct < 40) colorClass = 'bg-red-500'; 
                         else if(pct < 70) colorClass = 'bg-yellow-500';
 
                         html += `
@@ -1066,9 +1083,9 @@
                     return html;
                 };
 
-                const renderChecklistGroup = (title, items, icon) => {
+                const renderRoadmap = (items) => {
                     if(items.length === 0) return '';
-                    let html = `<div class="mt-2"><div class="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1 mb-1">${icon} ${title}</div>`;
+                    let html = `<div class="mt-2"><div class="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1 mb-1"><i data-lucide="map" class="w-3 h-3"></i> Study Roadmap</div>`;
                     items.forEach(sub => {
                          html += `
                             <div class="flex items-start gap-2 py-1 ml-2 subtask-line group relative">
@@ -1079,6 +1096,60 @@
                                  <button onclick="deleteSubtask('${sub.id}', '${task.id}')" class="text-gray-300 hover:text-red-400 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <i data-lucide="trash-2" class="w-3 h-3"></i>
                                  </button>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    return html;
+                };
+
+                const renderKeyResults = (krs) => {
+                    if(krs.length === 0) return '';
+                    let html = `<div class="mt-2"><div class="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1 mb-1"><i data-lucide="target" class="w-3 h-3"></i> Key Results (Milestones)</div>`;
+                    
+                    krs.forEach(kr => {
+                        const subSteps = krSubSteps[kr.id] || [];
+                        const hasSubSteps = subSteps.length > 0;
+                        
+                        html += `
+                            <div class="mb-2">
+                                <div class="flex items-start gap-2 py-1 ml-2 group relative bg-gray-50 dark:bg-gray-800/40 rounded px-2">
+                                     <button onclick="toggleSubtaskComplete('${kr.id}', ${kr.is_completed}, '${task.id}')" class="text-gray-400 hover:text-green-500 p-0.5 mt-0.5">
+                                        <i data-lucide="${kr.is_completed ? 'check-circle' : 'circle'}" class="w-3.5 h-3.5 ${kr.is_completed ? 'text-green-500 fill-green-500/20' : ''}"></i>
+                                     </button>
+                                     <div class="flex-1">
+                                        <div class="text-xs ${kr.is_completed ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-200'} font-medium mt-0.5">${kr.title}</div>
+                                     </div>
+                                     <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                         <button onclick="toggleKrSubInput('${kr.id}')" class="text-blue-400 hover:text-blue-500 p-0.5" title="Add sub-task to this KR">
+                                            <i data-lucide="list-plus" class="w-3 h-3"></i>
+                                         </button>
+                                         <button onclick="deleteSubtask('${kr.id}', '${task.id}')" class="text-gray-300 hover:text-red-400 p-0.5">
+                                            <i data-lucide="trash-2" class="w-3 h-3"></i>
+                                         </button>
+                                     </div>
+                                </div>
+                                
+                                <!-- Sub-steps for this KR -->
+                                <div class="ml-6 border-l-2 border-gray-200 dark:border-gray-700 pl-2 mt-1 space-y-1">
+                                    ${subSteps.map(step => `
+                                        <div class="flex items-start gap-2 group/sub">
+                                            <button onclick="toggleSubtaskComplete('${step.id}', ${step.is_completed}, '${task.id}')" class="text-gray-400 hover:text-green-500 p-0.5">
+                                                <i data-lucide="${step.is_completed ? 'check-square' : 'square'}" class="w-3 h-3 ${step.is_completed ? 'text-green-500' : ''}"></i>
+                                            </button>
+                                            <span class="text-[11px] ${step.is_completed ? 'line-through text-gray-400' : 'text-gray-500 dark:text-gray-400'} flex-1 leading-tight">${step.title}</span>
+                                            <button onclick="deleteSubtask('${step.id}', '${task.id}')" class="text-gray-300 hover:text-red-400 p-0.5 opacity-0 group-hover/sub:opacity-100 transition-opacity">
+                                                <i data-lucide="x" class="w-3 h-3"></i>
+                                            </button>
+                                        </div>
+                                    `).join('')}
+                                    
+                                    <!-- Add Sub-step Form -->
+                                    <div id="add-kr-sub-form-${kr.id}" class="hidden flex gap-1 mt-1">
+                                        <input type="text" id="kr-sub-input-${kr.id}" placeholder="Sub-task..." class="flex-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-1.5 py-0.5 text-[10px] outline-none">
+                                        <button onclick="addKrSubStep('${task.id}', '${kr.id}', this)" class="bg-blue-500 text-white rounded px-2 py-0.5 text-[10px]">Add</button>
+                                    </div>
+                                </div>
                             </div>
                         `;
                     });
@@ -1139,8 +1210,8 @@
                     
                     <div id="subtask-container-${task.id}" class="px-3 pb-2 ${subtasks.length > 0 ? 'block' : 'hidden'}">
                         ${renderKPIs(kpis)}
-                        ${renderChecklistGroup('Key Results (Milestones)', krs, '<i data-lucide="target" class="w-3 h-3"></i>')}
-                        ${renderChecklistGroup('Study Roadmap', roadmap, '<i data-lucide="map" class="w-3 h-3"></i>')}
+                        ${renderKeyResults(mainKRs)}
+                        ${renderRoadmap(roadmaps)}
                     </div>
 
                     <div id="add-subtask-form-${task.id}" class="hidden px-3 pb-3 pt-2 border-t border-gray-100 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-800/50">
@@ -1180,6 +1251,34 @@
         window.toggleSubtaskInput = (taskId) => {
             const form = document.getElementById(`add-subtask-form-${taskId}`);
             form.classList.toggle('hidden');
+        };
+        
+        window.addKrSubStep = async (taskId, krId, btn) => {
+             const input = document.getElementById(`kr-sub-input-${krId}`);
+             const title = input.value;
+             if(!title) return;
+             
+             // Loading UI
+             const originalContent = btn.innerHTML;
+             btn.disabled = true;
+             btn.innerHTML = '...';
+             
+             try {
+                await addDoc(getTaskSubtasksRef(taskId), {
+                    parent_task_id: taskId,
+                    parent_kr_id: krId, // Link to parent Key Result
+                    title: title,
+                    category: 'kr_sub', // New category for sub-steps
+                    is_completed: 0,
+                    created_at: Date.now()
+                });
+                renderTasks();
+            } catch (error) {
+                console.error("Error adding sub-step:", error);
+                showSnackbar("Failed to add sub-step", "error");
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
         };
 
         window.addSubtask = async (taskId, btn) => {
