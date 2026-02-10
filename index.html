@@ -1224,7 +1224,7 @@
                         ${task.description || 'No description provided.'}
                     </div>
                     
-                    <div id="subtask-container-${task.id}" class="px-3 pb-2 ${subtasks.length > 0 ? 'block' : 'hidden'}">
+                    <div id="subtask-container-${task.id}" class="px-3 pb-2 ${allItems.length > 0 ? 'block' : 'hidden'}">
                         ${renderKPIs(kpis)}
                         ${renderKeyResults(mainKRs)}
                         ${renderRoadmap(roadmaps)}
