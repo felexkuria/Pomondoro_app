@@ -667,9 +667,7 @@
         // -------------------- Firestore Logic --------------------
         
         const getTasksRef = () => collection(db, 'artifacts', appId, 'users', userId, 'tasks');
-        // New: Subtasks are now a sub-collection of a specific task
         const getTaskSubtasksRef = (taskId) => collection(db, 'artifacts', appId, 'users', userId, 'tasks', taskId, 'subtasks');
-        
         const getSessionsRef = () => collection(db, 'artifacts', appId, 'users', userId, 'focus_sessions');
         const getSettingsRef = () => collection(db, 'artifacts', appId, 'users', userId, 'settings');
 
@@ -939,6 +937,35 @@
             if(descEl) descEl.classList.toggle('hidden');
         };
 
+        // UI Helper to toggle KPI inputs in the add form
+        window.handleTypeChange = (taskId) => {
+            const typeSelect = document.getElementById(`subtask-type-${taskId}`);
+            const kpiFields = document.getElementById(`kpi-fields-${taskId}`);
+            if (typeSelect.value === 'kpi') {
+                kpiFields.classList.remove('hidden');
+                kpiFields.classList.add('flex');
+            } else {
+                kpiFields.classList.add('hidden');
+                kpiFields.classList.remove('flex');
+            }
+        };
+
+        // Update KPI Value in Firestore
+        window.updateKPI = async (subId, taskId, newValue) => {
+            if (!userId) return;
+            try {
+                await updateDoc(doc(getTaskSubtasksRef(taskId), subId), { 
+                    current: parseFloat(newValue) 
+                });
+                // Optional: Re-render or just let the input stay. 
+                // Re-rendering ensures the progress bar updates visually.
+                renderTasks();
+            } catch (e) {
+                console.error("Error updating KPI:", e);
+                showSnackbar("Failed to update KPI", "error");
+            }
+        };
+
         async function renderTasks() {
             if (!userId) return;
             
@@ -982,7 +1009,11 @@
             tasks.forEach(task => {
                 const subtasks = task.subtasks || [];
                 const completedSubtasks = subtasks.filter(s => s.is_completed).length;
-                const progressPct = subtasks.length > 0 ? (completedSubtasks / subtasks.length) * 100 : 0;
+                
+                // For main progress bar: only count KRs and Roadmap items (checkboxes)
+                const checkableItems = subtasks.filter(s => s.category !== 'kpi');
+                const checkedItems = checkableItems.filter(s => s.is_completed).length;
+                const progressPct = checkableItems.length > 0 ? (checkedItems / checkableItems.length) * 100 : 0;
                 
                 const totalMinutes = task.total_minutes || 0;
                 const timeDisplay = formatMinutes(totalMinutes);
@@ -992,18 +1023,61 @@
                 const krs = subtasks.filter(s => s.category === 'kr');
                 const roadmap = subtasks.filter(s => s.category === 'roadmap' || !s.category);
 
-                const renderSubtaskGroup = (title, items, icon) => {
+                // --- RENDERERS ---
+                
+                const renderKPIs = (items) => {
+                    if (items.length === 0) return '';
+                    let html = `<div class="mt-3 mb-3"><div class="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1 mb-2"><i data-lucide="bar-chart-2" class="w-3 h-3"></i> Key Performance Indicators</div>`;
+                    
+                    items.forEach(sub => {
+                        const current = sub.current || 0;
+                        const target = sub.target || 100;
+                        const unit = sub.unit || '';
+                        const pct = Math.min(100, Math.max(0, (current / target) * 100));
+                        
+                        // Color logic for KPI
+                        let colorClass = 'bg-blue-500';
+                        if(pct >= 100) colorClass = 'bg-green-500';
+                        else if(pct < 40) colorClass = 'bg-red-500'; // "Red" if below 40% per Google OKR notes
+                        else if(pct < 70) colorClass = 'bg-yellow-500';
+
+                        html += `
+                        <div class="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-2 mb-2 border border-gray-100 dark:border-gray-700 relative group">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-medium text-gray-700 dark:text-gray-300">${sub.title}</span>
+                                <div class="flex items-center gap-1">
+                                    <input type="number" 
+                                           value="${current}" 
+                                           onchange="updateKPI('${sub.id}', '${task.id}', this.value)"
+                                           class="w-12 text-right bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded px-1 text-xs focus:ring-1 focus:ring-green-500 outline-none"
+                                    />
+                                    <span class="text-[10px] text-gray-400">/ ${target} ${unit}</span>
+                                </div>
+                            </div>
+                            <div class="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div class="h-full ${colorClass} transition-all duration-500" style="width: ${pct}%"></div>
+                            </div>
+                             <button onclick="deleteSubtask('${sub.id}', '${task.id}')" class="absolute -top-1 -right-1 text-gray-300 hover:text-red-500 bg-white dark:bg-gray-800 rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                                <i data-lucide="x" class="w-3 h-3"></i>
+                             </button>
+                        </div>`;
+                    });
+                    html += '</div>';
+                    return html;
+                };
+
+                const renderChecklistGroup = (title, items, icon) => {
                     if(items.length === 0) return '';
                     let html = `<div class="mt-2"><div class="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1 mb-1">${icon} ${title}</div>`;
                     items.forEach(sub => {
                          html += `
-                            <div class="flex items-start gap-2 py-1 ml-2 subtask-line">
+                            <div class="flex items-start gap-2 py-1 ml-2 subtask-line group relative">
                                  <button onclick="toggleSubtaskComplete('${sub.id}', ${sub.is_completed}, '${task.id}')" class="text-gray-400 hover:text-green-500 p-0.5 mt-0.5">
                                     <i data-lucide="${sub.is_completed ? 'check-square' : 'square'}" class="w-3.5 h-3.5 ${sub.is_completed ? 'text-green-500' : ''}"></i>
                                  </button>
-                                 <span class="text-xs ${sub.is_completed ? 'line-through text-gray-400' : 'text-gray-600 dark:text-gray-300'} leading-tight mt-0.5">${sub.title}</span>
-                                 <button onclick="deleteSubtask('${sub.id}', '${task.id}')" class="ml-auto text-gray-400 hover:text-red-400 p-0.5">
-                                    <i data-lucide="x" class="w-3 h-3"></i>
+                                 <span class="text-xs ${sub.is_completed ? 'line-through text-gray-400' : 'text-gray-600 dark:text-gray-300'} leading-tight mt-0.5 flex-1">${sub.title}</span>
+                                 <button onclick="deleteSubtask('${sub.id}', '${task.id}')" class="text-gray-300 hover:text-red-400 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <i data-lucide="trash-2" class="w-3 h-3"></i>
                                  </button>
                             </div>
                         `;
@@ -1013,7 +1087,7 @@
                 };
 
                 const el = document.createElement('div');
-                el.className = `rounded-lg border mb-3 overflow-hidden transition-all ${
+                el.className = `rounded-lg border mb-3 overflow-hidden transition-all shadow-sm ${
                     task.is_active ? 'border-green-500 bg-green-50 dark:bg-green-900/10 dark:border-green-900' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
                 } ${task.is_completed ? 'opacity-60' : ''}`;
 
@@ -1024,17 +1098,17 @@
                                 <i data-lucide="${task.is_completed ? 'check-circle-2' : 'circle'}" class="w-5 h-5 ${task.is_completed ? 'text-green-500 fill-green-500/20' : ''}"></i>
                             </button>
                             <div class="flex-1 overflow-hidden">
-                                <div class="font-medium text-sm truncate ${task.is_completed ? 'line-through text-gray-500' : ''}">${task.title}</div>
+                                <div class="font-bold text-sm truncate ${task.is_completed ? 'line-through text-gray-500' : 'text-gray-800 dark:text-gray-200'}">${task.title}</div>
                                 <div class="flex items-center gap-2 mt-1">
                                     <span class="text-[10px] text-gray-400 flex items-center gap-1 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded" title="Total Focus Time">
                                         <i data-lucide="clock" class="w-3 h-3"></i> ${timeDisplay}
                                     </span>
                                     ${task.description ? `
                                     <button onclick="event.stopPropagation(); toggleDescription('${task.id}')" class="text-[10px] text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-1">
-                                        <i data-lucide="info" class="w-3 h-3"></i> Details
+                                        <i data-lucide="info" class="w-3 h-3"></i> Context
                                     </button>` : ''}
                                 </div>
-                                ${subtasks.length > 0 ? `
+                                ${checkableItems.length > 0 ? `
                                     <div class="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-2">
                                         <div class="h-full bg-green-500 rounded-full transition-all" style="width: ${progressPct}%"></div>
                                     </div>
@@ -1046,8 +1120,8 @@
                                 <span class="text-base sm:text-lg">${task.act_pomodoros || 0}</span>/<span class="text-xs sm:text-sm">${task.est_pomodoros}</span>
                             </div>
                             <div class="flex items-center gap-1">
-                                <button class="text-gray-400 hover:text-blue-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); toggleSubtaskInput('${task.id}')" title="Add Key Result/KPI">
-                                    <i data-lucide="list-plus" class="w-4 h-4"></i>
+                                <button class="text-gray-400 hover:text-blue-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); toggleSubtaskInput('${task.id}')" title="Add Metric or Result">
+                                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
                                 </button>
                                 <button class="text-gray-400 hover:text-yellow-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); editTask('${task.id}')" title="Edit Goal">
                                     <i data-lucide="pencil" class="w-4 h-4"></i>
@@ -1059,27 +1133,42 @@
                         </div>
                     </div>
                     
-                    <div id="desc-${task.id}" class="hidden px-4 pb-2 text-xs text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700/50 mb-2">
-                        ${task.description || ''}
+                    <div id="desc-${task.id}" class="hidden px-4 pb-3 text-xs text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700/50 mb-2 bg-gray-50/50 dark:bg-gray-800/30 italic">
+                        ${task.description || 'No description provided.'}
                     </div>
                     
                     <div id="subtask-container-${task.id}" class="px-3 pb-2 ${subtasks.length > 0 ? 'block' : 'hidden'}">
-                        ${renderSubtaskGroup('KPIs', kpis, '<i data-lucide="target" class="w-3 h-3"></i>')}
-                        ${renderSubtaskGroup('Key Results', krs, '<i data-lucide="bar-chart-2" class="w-3 h-3"></i>')}
-                        ${renderSubtaskGroup('Roadmap', roadmap, '<i data-lucide="map" class="w-3 h-3"></i>')}
+                        ${renderKPIs(kpis)}
+                        ${renderChecklistGroup('Key Results (Milestones)', krs, '<i data-lucide="target" class="w-3 h-3"></i>')}
+                        ${renderChecklistGroup('Study Roadmap', roadmap, '<i data-lucide="map" class="w-3 h-3"></i>')}
                     </div>
 
-                    <div id="add-subtask-form-${task.id}" class="hidden px-3 pb-3 pt-1 border-t border-gray-100 dark:border-gray-700/50">
+                    <div id="add-subtask-form-${task.id}" class="hidden px-3 pb-3 pt-2 border-t border-gray-100 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-800/50">
                         <div class="flex flex-col gap-2">
                             <div class="flex gap-2">
-                                <select id="subtask-type-${task.id}" class="text-xs bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 outline-none">
+                                <select id="subtask-type-${task.id}" onchange="handleTypeChange('${task.id}')" class="text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 outline-none focus:border-green-500">
                                     <option value="roadmap">Roadmap</option>
-                                    <option value="kpi">KPI</option>
+                                    <option value="kpi">KPI (Measure)</option>
                                     <option value="kr">Key Result</option>
                                 </select>
-                                <input type="text" id="subtask-input-${task.id}" placeholder="Item description..." class="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-green-500">
+                                <input type="text" id="subtask-input-${task.id}" placeholder="Description (e.g. Master Example 4)..." class="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-green-500">
                             </div>
-                            <button onclick="addSubtask('${task.id}', this)" class="w-full py-1 bg-green-500 text-white rounded text-xs flex items-center justify-center font-bold hover:bg-green-600">Add Item</button>
+                            
+                            <!-- KPI Specific Fields (Hidden by default) -->
+                            <div id="kpi-fields-${task.id}" class="hidden gap-2">
+                                <div class="flex-1 flex items-center gap-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1">
+                                    <span class="text-[10px] font-bold text-gray-400 uppercase">Target</span>
+                                    <input type="number" id="kpi-target-${task.id}" placeholder="100" class="w-full bg-transparent text-xs focus:outline-none">
+                                </div>
+                                <div class="w-20 flex items-center gap-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1">
+                                    <span class="text-[10px] font-bold text-gray-400 uppercase">Unit</span>
+                                    <input type="text" id="kpi-unit-${task.id}" placeholder="%" class="w-full bg-transparent text-xs focus:outline-none">
+                                </div>
+                            </div>
+
+                            <button onclick="addSubtask('${task.id}', this)" class="w-full py-1.5 bg-green-500 text-white rounded text-xs flex items-center justify-center font-bold hover:bg-green-600 shadow-sm">
+                                <i data-lucide="plus" class="w-3 h-3 mr-1"></i> Add Item
+                            </button>
                         </div>
                     </div>
                 `;
@@ -1101,23 +1190,51 @@
             
             if(!title) return;
             
+            // Get KPI specific data if applicable
+            let target = null;
+            let unit = null;
+            let current = 0;
+            
+            if(category === 'kpi') {
+                target = document.getElementById(`kpi-target-${taskId}`).value || 100;
+                unit = document.getElementById(`kpi-unit-${taskId}`).value || '';
+            }
+            
             const originalContent = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i>`;
             lucide.createIcons();
 
             try {
-                await addDoc(getTaskSubtasksRef(taskId), {
+                const data = {
                     parent_task_id: taskId,
                     title: title,
                     category: category,
                     is_completed: 0,
                     created_at: Date.now()
-                });
+                };
+                
+                // Add extra fields for KPI
+                if (category === 'kpi') {
+                    data.target = parseFloat(target);
+                    data.current = 0;
+                    data.unit = unit;
+                }
+
+                await addDoc(getTaskSubtasksRef(taskId), data);
+                
+                // Clear inputs
+                input.value = '';
+                if(category === 'kpi') {
+                    document.getElementById(`kpi-target-${taskId}`).value = '';
+                    document.getElementById(`kpi-unit-${taskId}`).value = '';
+                }
+                
                 renderTasks();
             } catch (error) {
                 console.error("Error adding item:", error);
                 showSnackbar("Failed to add item", "error");
+            } finally {
                 btn.disabled = false;
                 btn.innerHTML = originalContent;
             }
