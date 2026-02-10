@@ -509,14 +509,12 @@
                   </div>
 
                   <!-- Objectives List -->
-                  <div class="flex justify-between items-center mb-4">
-                      <h4 class="text-lg font-bold">Objectives</h4>
-                      <button id="addObjective" class="px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm flex items-center gap-1">
-                          <i data-lucide="plus" class="w-4 h-4"></i> Add Objective
-                      </button>
+                  <div class="mb-4">
+                      <h4 class="text-lg font-bold">Objectives (from Tasks with Key Results)</h4>
+                      <p class="text-xs text-gray-500 mt-1">Add Key Results to your tasks to track them here. Scores are saved automatically.</p>
                   </div>
                   <div id="objectivesList" class="space-y-4">
-                      <div class="text-center text-gray-500 py-8 italic">No objectives yet. Add one to get started!</div>
+                      <div class="text-center text-gray-500 py-8 italic">Loading objectives...</div>
                   </div>
               </div>
           </div>
@@ -2110,9 +2108,7 @@
         }
 
         // -------------------- OKR Scoring System --------------------
-        let okrData = JSON.parse(localStorage.getItem('okrData')) || [];
-        let okrViewMode = 'individual';
-
+        
         function getScoreColor(score) {
             if (score >= 0.8) return { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', label: 'Exceeded/Sandbagging' };
             if (score >= 0.6) return { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-300', label: 'Sweet Spot 🎯' };
@@ -2120,22 +2116,38 @@
             return { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', label: 'Needs Attention' };
         }
 
-        function calculateOKRScores() {
-            okrData.forEach(obj => {
-                const krScores = obj.keyResults.map(kr => kr.score || 0);
-                obj.score = krScores.length > 0 ? krScores.reduce((a, b) => a + b, 0) / krScores.length : 0;
-            });
-            const totalScore = okrData.length > 0 ? okrData.reduce((sum, obj) => sum + obj.score, 0) / okrData.length : 0;
-            return totalScore;
-        }
+        async function renderOKRDashboard() {
+            if (!userId) {
+                document.getElementById('objectivesList').innerHTML = '<div class="text-center text-gray-500 py-8 italic">Sign in to view OKR scores</div>';
+                return;
+            }
 
-        function saveOKRData() {
-            localStorage.setItem('okrData', JSON.stringify(okrData));
-            renderOKRDashboard();
-        }
+            const tasksSnap = await getDocs(getTasksRef());
+            const objectives = [];
+            
+            for (const taskDoc of tasksSnap.docs) {
+                const task = { id: taskDoc.id, ...taskDoc.data() };
+                const subSnap = await getDocs(getTaskSubtasksRef(task.id));
+                const keyResults = [];
+                
+                subSnap.forEach(subDoc => {
+                    const sub = subDoc.data();
+                    if (sub.category === 'kr') {
+                        keyResults.push({
+                            id: subDoc.id,
+                            title: sub.title,
+                            score: sub.okr_score || 0
+                        });
+                    }
+                });
+                
+                if (keyResults.length > 0) {
+                    const objScore = keyResults.reduce((sum, kr) => sum + kr.score, 0) / keyResults.length;
+                    objectives.push({ ...task, keyResults, score: objScore });
+                }
+            }
 
-        function renderOKRDashboard() {
-            const totalScore = calculateOKRScores();
+            const totalScore = objectives.length > 0 ? objectives.reduce((sum, obj) => sum + obj.score, 0) / objectives.length : 0;
             const scoreEl = document.getElementById('totalScore');
             const labelEl = document.getElementById('scoreLabel');
             const listEl = document.getElementById('objectivesList');
@@ -2146,52 +2158,42 @@
             labelEl.textContent = color.label;
             labelEl.className = `text-sm px-3 py-1 rounded-full inline-block ${color.bg} ${color.text} font-medium`;
 
-            if (okrData.length === 0) {
-                listEl.innerHTML = '<div class="text-center text-gray-500 py-8 italic">No objectives yet. Add one to get started!</div>';
+            if (objectives.length === 0) {
+                listEl.innerHTML = '<div class="text-center text-gray-500 py-8 italic">No objectives with Key Results found. Add Key Results to your tasks to track OKR scores.</div>';
                 return;
             }
 
-            listEl.innerHTML = okrData.map((obj, objIdx) => {
+            listEl.innerHTML = objectives.map(obj => {
                 const objColor = getScoreColor(obj.score);
                 return `
                     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                         <div class="p-4 bg-gray-50 dark:bg-gray-900/50 flex justify-between items-start">
                             <div class="flex-1">
-                                <input type="text" value="${obj.title}" onchange="updateObjectiveTitle(${objIdx}, this.value)" 
-                                       class="font-bold text-lg bg-transparent border-none outline-none w-full focus:ring-2 focus:ring-purple-500 rounded px-2 py-1" placeholder="Objective Title">
+                                <div class="font-bold text-lg">${obj.title}</div>
+                                ${obj.description ? `<div class="text-xs text-gray-500 mt-1">${obj.description}</div>` : ''}
                                 <div class="mt-2 flex items-center gap-2">
                                     <span class="text-sm font-semibold">Score:</span>
                                     <span class="text-2xl font-bold ${objColor.text}">${obj.score.toFixed(2)}</span>
                                     <span class="text-xs px-2 py-0.5 rounded-full ${objColor.bg} ${objColor.text}">${objColor.label}</span>
                                 </div>
                             </div>
-                            <button onclick="deleteObjective(${objIdx})" class="text-gray-400 hover:text-red-500 p-1">
-                                <i data-lucide="trash-2" class="w-4 h-4"></i>
-                            </button>
                         </div>
                         <div class="p-4 space-y-3">
-                            ${obj.keyResults.map((kr, krIdx) => {
+                            ${obj.keyResults.map(kr => {
                                 const krColor = getScoreColor(kr.score || 0);
                                 return `
                                     <div class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900/30 rounded-lg">
                                         <div class="flex-1">
-                                            <input type="text" value="${kr.title}" onchange="updateKRTitle(${objIdx}, ${krIdx}, this.value)"
-                                                   class="text-sm font-medium bg-transparent border-none outline-none w-full focus:ring-2 focus:ring-purple-500 rounded px-2 py-1" placeholder="Key Result">
+                                            <div class="text-sm font-medium">${kr.title}</div>
                                         </div>
                                         <div class="flex items-center gap-2">
                                             <input type="number" min="0" max="1" step="0.1" value="${kr.score || 0}" 
-                                                   onchange="updateKRScore(${objIdx}, ${krIdx}, this.value)"
+                                                   onchange="updateKRScore('${obj.id}', '${kr.id}', this.value)"
                                                    class="w-16 px-2 py-1 text-center border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-sm font-bold ${krColor.text}">
-                                            <button onclick="deleteKR(${objIdx}, ${krIdx})" class="text-gray-400 hover:text-red-500 p-1">
-                                                <i data-lucide="x" class="w-3 h-3"></i>
-                                            </button>
                                         </div>
                                     </div>
                                 `;
                             }).join('')}
-                            <button onclick="addKR(${objIdx})" class="w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-500 hover:border-purple-500 hover:text-purple-500 transition-colors flex items-center justify-center gap-1">
-                                <i data-lucide="plus" class="w-4 h-4"></i> Add Key Result
-                            </button>
                         </div>
                     </div>
                 `;
@@ -2199,17 +2201,17 @@
             lucide.createIcons();
         }
 
-        window.updateObjectiveTitle = (idx, value) => { okrData[idx].title = value; saveOKRData(); };
-        window.updateKRTitle = (objIdx, krIdx, value) => { okrData[objIdx].keyResults[krIdx].title = value; saveOKRData(); };
-        window.updateKRScore = (objIdx, krIdx, value) => { okrData[objIdx].keyResults[krIdx].score = parseFloat(value); saveOKRData(); };
-        window.deleteObjective = (idx) => { if(confirm('Delete this objective?')) { okrData.splice(idx, 1); saveOKRData(); } };
-        window.deleteKR = (objIdx, krIdx) => { okrData[objIdx].keyResults.splice(krIdx, 1); saveOKRData(); };
-        window.addKR = (objIdx) => { okrData[objIdx].keyResults.push({ title: '', score: 0 }); saveOKRData(); };
-
-        document.getElementById('addObjective').addEventListener('click', () => {
-            okrData.push({ title: 'New Objective', keyResults: [{ title: '', score: 0 }], score: 0 });
-            saveOKRData();
-        });
+        window.updateKRScore = async (taskId, krId, value) => {
+            if (!userId) return;
+            try {
+                await updateDoc(doc(getTaskSubtasksRef(taskId), krId), { okr_score: parseFloat(value) });
+                renderOKRDashboard();
+                showSnackbar('Score updated', 'success');
+            } catch (e) {
+                console.error('Error updating score:', e);
+                showSnackbar('Failed to update score', 'error');
+            }
+        };
 
         document.getElementById('openOKR').addEventListener('click', () => {
             document.getElementById('okrModal').classList.remove('hidden');
@@ -2221,9 +2223,7 @@
         });
 
         document.getElementById('okrViewToggle').addEventListener('click', (e) => {
-            okrViewMode = okrViewMode === 'individual' ? 'team' : 'individual';
-            e.target.textContent = okrViewMode === 'individual' ? 'Individual View' : 'Team View';
-            showSnackbar(`Switched to ${okrViewMode} view`, 'info');
+            showSnackbar('Team view coming soon', 'info');
         });
         
         updateTimerDisplay(focusSelect.value * 60, focusSelect.value * 60);
