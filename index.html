@@ -620,7 +620,7 @@
                     document.getElementById('dbStatus').style.opacity = '1';
                     setTimeout(() => document.getElementById('dbStatus').style.opacity = '0', 5000);
                     await loadSettings();
-                    loadFromFirestore();
+                    await loadFromFirestore();
                     restoreLocalState();
                 } else {
                     // --- USER IS LOGGED OUT (Guest/Default Data) ---
@@ -785,60 +785,65 @@
         async function loadFromFirestore() {
             if(!userId) return;
             
-            // 1. Fetch Sessions for Stats (Full History)
-            const sessionsSnap = await getDocs(getSessionsRef());
-            let totalMins = 0;
-            const sessionData = [];
-            const dates = [];
-            
-            sessionsSnap.forEach(doc => {
-                const data = doc.data();
-                totalMins += (data.duration || 0);
-                sessionData.push(data);
-                if(data.date) dates.push(data.date);
-            });
-
-            // Calc Total Hours
-            const h = Math.floor(totalMins / 60);
-            const m = totalMins % 60;
-            document.getElementById('totalFocus').textContent = `${h}h ${m}m`;
-
-            // Calc Streak
-            const uniqueDates = [...new Set(dates)].sort();
-            let streak = 0;
-            if(uniqueDates.length > 0) {
-                // Simple contiguous streak calc
-                let currentStreak = 1;
-                const todayStr = new Date().toISOString().slice(0, 10);
+            try {
+                // 1. Fetch Sessions for Stats (Full History)
+                const sessionsSnap = await getDocs(getSessionsRef());
+                let totalMins = 0;
+                const sessionData = [];
+                const dates = [];
                 
-                // If last session was not today or yesterday, streak is broken
-                const lastSessionDate = new Date(uniqueDates[uniqueDates.length-1]);
-                const diffTime = Math.abs(new Date(todayStr) - lastSessionDate);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-                
-                if (diffDays > 1) {
-                    streak = 0;
-                } else {
-                    // Iterate backwards
-                    streak = 1; 
-                    for(let i = uniqueDates.length - 1; i > 0; i--) {
-                        const d1 = new Date(uniqueDates[i]);
-                        const d2 = new Date(uniqueDates[i-1]);
-                        const diff = (d1 - d2) / (1000 * 60 * 60 * 24);
-                        if(Math.round(diff) === 1) {
-                            streak++;
-                        } else {
-                            break;
+                sessionsSnap.forEach(doc => {
+                    const data = doc.data();
+                    totalMins += (data.duration || 0);
+                    sessionData.push(data);
+                    if(data.date) dates.push(data.date);
+                });
+
+                // Calc Total Hours
+                const h = Math.floor(totalMins / 60);
+                const m = totalMins % 60;
+                document.getElementById('totalFocus').textContent = `${h}h ${m}m`;
+
+                // Calc Streak
+                const uniqueDates = [...new Set(dates)].sort();
+                let streak = 0;
+                if(uniqueDates.length > 0) {
+                    // Simple contiguous streak calc
+                    let currentStreak = 1;
+                    const todayStr = new Date().toISOString().slice(0, 10);
+                    
+                    // If last session was not today or yesterday, streak is broken
+                    const lastSessionDate = new Date(uniqueDates[uniqueDates.length-1]);
+                    const diffTime = Math.abs(new Date(todayStr) - lastSessionDate);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                    
+                    if (diffDays > 1) {
+                        streak = 0;
+                    } else {
+                        // Iterate backwards
+                        streak = 1; 
+                        for(let i = uniqueDates.length - 1; i > 0; i--) {
+                            const d1 = new Date(uniqueDates[i]);
+                            const d2 = new Date(uniqueDates[i-1]);
+                            const diff = (d1 - d2) / (1000 * 60 * 60 * 24);
+                            if(Math.round(diff) === 1) {
+                                streak++;
+                            } else {
+                                break;
+                            }
                         }
                     }
                 }
-            }
-            document.getElementById('streakCounter').textContent = `${streak} 🔥`;
+                document.getElementById('streakCounter').textContent = `${streak} 🔥`;
 
-            renderGitHubGraph(sessionData);
-            
-            // 2. Fetch Tasks
-            renderTasks();
+                renderGitHubGraph(sessionData);
+                
+                // 2. Fetch Tasks
+                await renderTasks();
+            } catch (error) {
+                console.error('Error loading from Firestore:', error);
+                showSnackbar('Failed to load data', 'error');
+            }
         }
 
         // -------------------- Task Logic --------------------
@@ -976,44 +981,55 @@
         };
 
         async function renderTasks() {
-            if (!userId) return;
-            
-            const tasksSnap = await getDocs(getTasksRef());
-            let tasks = [];
-            
-            tasksSnap.forEach(doc => tasks.push({id: doc.id, ...doc.data()}));
-            
-            await Promise.all(tasks.map(async (task) => {
-                const subSnap = await getDocs(getTaskSubtasksRef(task.id));
-                task.subtasks = [];
-                subSnap.forEach(subDoc => {
-                    task.subtasks.push({id: subDoc.id, ...subDoc.data()});
-                });
-                task.subtasks.sort((a,b) => a.created_at - b.created_at);
-            }));
-            
-            tasks.sort((a, b) => {
-                if (a.is_completed !== b.is_completed) return a.is_completed - b.is_completed;
-                return b.created_at - a.created_at;
-            });
-
-            const listEl = document.getElementById('taskList');
-            listEl.innerHTML = '';
-            
-            const activeTask = tasks.find(t => t.is_active === 1 && t.is_completed === 0);
-            if(activeTask) {
-                document.getElementById('currentTaskDisplay').classList.remove('hidden');
-                document.getElementById('currentTaskTitle').textContent = activeTask.title;
-                localStorage.setItem('activeTaskTitle', activeTask.title);
-            } else {
-                document.getElementById('currentTaskDisplay').classList.add('hidden');
-                localStorage.removeItem('activeTaskTitle');
-            }
-
-            if(tasks.length === 0) {
-                listEl.innerHTML = '<div class="text-center text-gray-500 py-4 italic text-sm">No goals set. Add a SMART goal to start!</div>';
+            if (!userId) {
+                console.log('renderTasks: No userId, skipping');
                 return;
             }
+            
+            try {
+                console.log('renderTasks: Fetching tasks for user:', userId);
+                const tasksSnap = await getDocs(getTasksRef());
+                let tasks = [];
+                
+                tasksSnap.forEach(doc => tasks.push({id: doc.id, ...doc.data()}));
+                console.log('renderTasks: Found', tasks.length, 'tasks');
+                
+                await Promise.all(tasks.map(async (task) => {
+                    const subSnap = await getDocs(getTaskSubtasksRef(task.id));
+                    task.subtasks = [];
+                    subSnap.forEach(subDoc => {
+                        task.subtasks.push({id: subDoc.id, ...subDoc.data()});
+                    });
+                    task.subtasks.sort((a,b) => a.created_at - b.created_at);
+                }));
+                
+                tasks.sort((a, b) => {
+                    if (a.is_completed !== b.is_completed) return a.is_completed - b.is_completed;
+                    return b.created_at - a.created_at;
+                });
+
+                const listEl = document.getElementById('taskList');
+                if (!listEl) {
+                    console.error('renderTasks: taskList element not found');
+                    return;
+                }
+                listEl.innerHTML = '';
+                
+                const activeTask = tasks.find(t => t.is_active === 1 && t.is_completed === 0);
+                if(activeTask) {
+                    document.getElementById('currentTaskDisplay')?.classList.remove('hidden');
+                    const titleEl = document.getElementById('currentTaskTitle');
+                    if (titleEl) titleEl.textContent = activeTask.title;
+                    localStorage.setItem('activeTaskTitle', activeTask.title);
+                } else {
+                    document.getElementById('currentTaskDisplay')?.classList.add('hidden');
+                    localStorage.removeItem('activeTaskTitle');
+                }
+
+                if(tasks.length === 0) {
+                    listEl.innerHTML = '<div class="text-center text-gray-500 py-4 italic text-sm">No goals set. Add a SMART goal to start!</div>';
+                    return;
+                }
 
             tasks.forEach(task => {
                 const allItems = task.subtasks || [];
@@ -1246,6 +1262,14 @@
                 listEl.appendChild(el);
             });
             lucide.createIcons();
+            } catch (error) {
+                console.error('Error rendering tasks:', error);
+                const listEl = document.getElementById('taskList');
+                if (listEl) {
+                    listEl.innerHTML = '<div class="text-center text-red-500 py-4 text-sm">Error loading goals. Please refresh the page.</div>';
+                }
+                showSnackbar('Failed to load goals', 'error');
+            }
         }
 
         window.toggleSubtaskInput = (taskId) => {
