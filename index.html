@@ -322,21 +322,22 @@
 
                 <!-- Add/Edit Task Form -->
                 <div id="addTaskForm" class="hidden mb-4 bg-gray-50 dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
-                    <h3 id="formTitle" class="text-xs font-bold text-gray-500 mb-2 uppercase">Add New Task</h3>
-                    <input type="text" id="newTaskTitle" placeholder="What are you working on?" class="w-full mb-3 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 focus:ring-2 focus:ring-green-500 outline-none text-sm">
+                    <h3 id="formTitle" class="text-xs font-bold text-gray-500 mb-2 uppercase">New Strategic Goal</h3>
+                    <input type="text" id="newTaskTitle" placeholder="Goal Title (e.g., Master SST 101)" class="w-full mb-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 focus:ring-2 focus:ring-green-500 outline-none text-sm">
+                    <textarea id="newTaskDesc" rows="3" placeholder="SMART Goal Description & Context..." class="w-full mb-3 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-800 focus:ring-2 focus:ring-green-500 outline-none text-sm"></textarea>
                     <div class="flex items-center gap-4 mb-3">
                         <span class="text-sm font-semibold">Est Pomodoros:</span>
-                        <input type="number" id="newTaskEst" value="1" min="1" max="10" class="w-16 px-2 py-1 rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-800 text-sm">
+                        <input type="number" id="newTaskEst" value="1" min="1" max="50" class="w-16 px-2 py-1 rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-800 text-sm">
                     </div>
                     <div class="flex justify-end gap-2">
                         <button id="cancelAddTask" class="px-3 py-1 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Cancel</button>
-                        <button id="saveTask" class="px-4 py-1.5 bg-green-500 text-white rounded-lg text-xs font-bold hover:bg-green-600">SAVE</button>
+                        <button id="saveTask" class="px-4 py-1.5 bg-green-500 text-white rounded-lg text-xs font-bold hover:bg-green-600">SAVE GOAL</button>
                     </div>
                 </div>
 
                 <!-- Task List -->
                 <div id="taskList" class="space-y-4 max-h-[500px] overflow-y-auto pr-1">
-                    <div class="text-center text-gray-500 py-4 italic text-sm">Loading tasks...</div>
+                    <div class="text-center text-gray-500 py-4 italic text-sm">Loading goals...</div>
                 </div>
             </div>
         </div>
@@ -855,14 +856,16 @@
 
         function resetForm() {
             document.getElementById('newTaskTitle').value = '';
+            document.getElementById('newTaskDesc').value = '';
             document.getElementById('newTaskEst').value = '1';
-            document.getElementById('saveTask').textContent = 'SAVE';
-            document.getElementById('formTitle').textContent = 'ADD NEW TASK';
+            document.getElementById('saveTask').textContent = 'SAVE GOAL';
+            document.getElementById('formTitle').textContent = 'NEW STRATEGIC GOAL';
             editingTaskId = null;
         }
 
         document.getElementById('saveTask').addEventListener('click', async () => {
             const title = document.getElementById('newTaskTitle').value;
+            const desc = document.getElementById('newTaskDesc').value;
             const est = document.getElementById('newTaskEst').value;
             const saveBtn = document.getElementById('saveTask');
 
@@ -878,14 +881,17 @@
                 if (editingTaskId) {
                     await updateDoc(doc(getTasksRef(), editingTaskId), {
                         title: title,
+                        description: desc,
                         est_pomodoros: parseInt(est)
                     });
-                    showSnackbar("Task updated!", "success");
+                    showSnackbar("Goal updated!", "success");
                 } else {
                     await addDoc(getTasksRef(), {
                         title: title,
+                        description: desc,
                         est_pomodoros: parseInt(est),
                         act_pomodoros: 0,
+                        total_minutes: 0,
                         is_completed: 0,
                         is_active: 0,
                         created_at: Date.now()
@@ -895,8 +901,8 @@
                 resetForm();
                 renderTasks();
             } catch (error) {
-                console.error("Error saving task:", error);
-                showSnackbar("Failed to save task", "error");
+                console.error("Error saving goal:", error);
+                showSnackbar("Failed to save goal", "error");
             } finally {
                 saveBtn.disabled = false;
                 saveBtn.textContent = originalText;
@@ -909,11 +915,12 @@
              if (docSnap.exists()) {
                  const task = docSnap.data();
                  document.getElementById('newTaskTitle').value = task.title;
+                 document.getElementById('newTaskDesc').value = task.description || '';
                  document.getElementById('newTaskEst').value = task.est_pomodoros;
                  
                  editingTaskId = id;
-                 document.getElementById('saveTask').textContent = 'UPDATE';
-                 document.getElementById('formTitle').textContent = 'EDIT TASK';
+                 document.getElementById('saveTask').textContent = 'UPDATE GOAL';
+                 document.getElementById('formTitle').textContent = 'EDIT GOAL';
                  document.getElementById('addTaskForm').classList.remove('hidden');
                  document.getElementById('addTaskForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
              }
@@ -926,6 +933,11 @@
             if (h > 0) return `${h}h ${m}m`;
             return `${m}m`;
         }
+        
+        window.toggleDescription = (id) => {
+            const descEl = document.getElementById(`desc-${id}`);
+            if(descEl) descEl.classList.toggle('hidden');
+        };
 
         async function renderTasks() {
             if (!userId) return;
@@ -933,17 +945,14 @@
             const tasksSnap = await getDocs(getTasksRef());
             let tasks = [];
             
-            // 1. Fetch all tasks
             tasksSnap.forEach(doc => tasks.push({id: doc.id, ...doc.data()}));
             
-            // 2. Fetch subtasks for each task (Nested Collection)
             await Promise.all(tasks.map(async (task) => {
                 const subSnap = await getDocs(getTaskSubtasksRef(task.id));
                 task.subtasks = [];
                 subSnap.forEach(subDoc => {
                     task.subtasks.push({id: subDoc.id, ...subDoc.data()});
                 });
-                // Sort subtasks by creation time
                 task.subtasks.sort((a,b) => a.created_at - b.created_at);
             }));
             
@@ -966,39 +975,47 @@
             }
 
             if(tasks.length === 0) {
-                listEl.innerHTML = '<div class="text-center text-gray-500 py-4 italic text-sm">No tasks yet. Add one to get started!</div>';
+                listEl.innerHTML = '<div class="text-center text-gray-500 py-4 italic text-sm">No goals set. Add a SMART goal to start!</div>';
                 return;
             }
 
             tasks.forEach(task => {
-                // Use the subtasks we fetched earlier
                 const subtasks = task.subtasks || [];
                 const completedSubtasks = subtasks.filter(s => s.is_completed).length;
                 const progressPct = subtasks.length > 0 ? (completedSubtasks / subtasks.length) * 100 : 0;
                 
-                // Calculate time display
                 const totalMinutes = task.total_minutes || 0;
                 const timeDisplay = formatMinutes(totalMinutes);
+                
+                // Group subtasks
+                const kpis = subtasks.filter(s => s.category === 'kpi');
+                const krs = subtasks.filter(s => s.category === 'kr');
+                const roadmap = subtasks.filter(s => s.category === 'roadmap' || !s.category);
+
+                const renderSubtaskGroup = (title, items, icon) => {
+                    if(items.length === 0) return '';
+                    let html = `<div class="mt-2"><div class="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1 mb-1">${icon} ${title}</div>`;
+                    items.forEach(sub => {
+                         html += `
+                            <div class="flex items-start gap-2 py-1 ml-2 subtask-line">
+                                 <button onclick="toggleSubtaskComplete('${sub.id}', ${sub.is_completed}, '${task.id}')" class="text-gray-400 hover:text-green-500 p-0.5 mt-0.5">
+                                    <i data-lucide="${sub.is_completed ? 'check-square' : 'square'}" class="w-3.5 h-3.5 ${sub.is_completed ? 'text-green-500' : ''}"></i>
+                                 </button>
+                                 <span class="text-xs ${sub.is_completed ? 'line-through text-gray-400' : 'text-gray-600 dark:text-gray-300'} leading-tight mt-0.5">${sub.title}</span>
+                                 <button onclick="deleteSubtask('${sub.id}', '${task.id}')" class="ml-auto text-gray-400 hover:text-red-400 p-0.5">
+                                    <i data-lucide="x" class="w-3 h-3"></i>
+                                 </button>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    return html;
+                };
 
                 const el = document.createElement('div');
                 el.className = `rounded-lg border mb-3 overflow-hidden transition-all ${
                     task.is_active ? 'border-green-500 bg-green-50 dark:bg-green-900/10 dark:border-green-900' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
                 } ${task.is_completed ? 'opacity-60' : ''}`;
-
-                let subtasksHtml = '';
-                subtasks.forEach(sub => {
-                    subtasksHtml += `
-                        <div class="flex items-center gap-2 py-1 ml-4 subtask-line">
-                             <button onclick="toggleSubtaskComplete('${sub.id}', ${sub.is_completed}, '${task.id}')" class="text-gray-400 hover:text-green-500 p-1">
-                                <i data-lucide="${sub.is_completed ? 'check-square' : 'square'}" class="w-4 h-4 ${sub.is_completed ? 'text-green-500' : ''}"></i>
-                             </button>
-                             <span class="text-xs ${sub.is_completed ? 'line-through text-gray-400' : 'text-gray-600 dark:text-gray-300'}">${sub.title}</span>
-                             <button onclick="deleteSubtask('${sub.id}', '${task.id}')" class="ml-auto text-gray-400 hover:text-red-400 p-1">
-                                <i data-lucide="x" class="w-3 h-3"></i>
-                             </button>
-                        </div>
-                    `;
-                });
 
                 el.innerHTML = `
                     <div class="p-3 flex items-start gap-3 group relative">
@@ -1009,43 +1026,60 @@
                             <div class="flex-1 overflow-hidden">
                                 <div class="font-medium text-sm truncate ${task.is_completed ? 'line-through text-gray-500' : ''}">${task.title}</div>
                                 <div class="flex items-center gap-2 mt-1">
-                                    <span class="text-[10px] text-gray-400 flex items-center gap-1 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                                    <span class="text-[10px] text-gray-400 flex items-center gap-1 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded" title="Total Focus Time">
                                         <i data-lucide="clock" class="w-3 h-3"></i> ${timeDisplay}
                                     </span>
-                                    ${subtasks.length > 0 ? `
-                                        <div class="w-20 h-1 bg-gray-200 dark:bg-gray-700 rounded-full">
-                                            <div class="h-full bg-green-500 rounded-full transition-all" style="width: ${progressPct}%"></div>
-                                        </div>
-                                    ` : ''}
+                                    ${task.description ? `
+                                    <button onclick="event.stopPropagation(); toggleDescription('${task.id}')" class="text-[10px] text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-1">
+                                        <i data-lucide="info" class="w-3 h-3"></i> Details
+                                    </button>` : ''}
                                 </div>
+                                ${subtasks.length > 0 ? `
+                                    <div class="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-2">
+                                        <div class="h-full bg-green-500 rounded-full transition-all" style="width: ${progressPct}%"></div>
+                                    </div>
+                                ` : ''}
                             </div>
                         </div>
                         <div class="flex flex-col items-end gap-1">
-                            <div class="text-xs font-mono text-gray-500 font-bold whitespace-nowrap">
+                            <div class="text-xs font-mono text-gray-500 font-bold whitespace-nowrap" title="Actual / Estimated Sessions">
                                 <span class="text-base sm:text-lg">${task.act_pomodoros || 0}</span>/<span class="text-xs sm:text-sm">${task.est_pomodoros}</span>
                             </div>
                             <div class="flex items-center gap-1">
-                                <button class="text-gray-400 hover:text-blue-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); toggleSubtaskInput('${task.id}')" title="Add Subtask">
+                                <button class="text-gray-400 hover:text-blue-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); toggleSubtaskInput('${task.id}')" title="Add Key Result/KPI">
                                     <i data-lucide="list-plus" class="w-4 h-4"></i>
                                 </button>
-                                <button class="text-gray-400 hover:text-yellow-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); editTask('${task.id}')" title="Edit Task">
+                                <button class="text-gray-400 hover:text-yellow-500 text-xs flex items-center gap-1 p-1" onclick="event.stopPropagation(); editTask('${task.id}')" title="Edit Goal">
                                     <i data-lucide="pencil" class="w-4 h-4"></i>
                                 </button>
-                                <button class="text-gray-400 hover:text-red-500 transition-opacity p-1" onclick="event.stopPropagation(); deleteTask('${task.id}', this)" title="Delete Task">
+                                <button class="text-gray-400 hover:text-red-500 transition-opacity p-1" onclick="event.stopPropagation(); deleteTask('${task.id}', this)" title="Delete Goal">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
                             </div>
                         </div>
                     </div>
                     
+                    <div id="desc-${task.id}" class="hidden px-4 pb-2 text-xs text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700/50 mb-2">
+                        ${task.description || ''}
+                    </div>
+                    
                     <div id="subtask-container-${task.id}" class="px-3 pb-2 ${subtasks.length > 0 ? 'block' : 'hidden'}">
-                        ${subtasksHtml}
+                        ${renderSubtaskGroup('KPIs', kpis, '<i data-lucide="target" class="w-3 h-3"></i>')}
+                        ${renderSubtaskGroup('Key Results', krs, '<i data-lucide="bar-chart-2" class="w-3 h-3"></i>')}
+                        ${renderSubtaskGroup('Roadmap', roadmap, '<i data-lucide="map" class="w-3 h-3"></i>')}
                     </div>
 
                     <div id="add-subtask-form-${task.id}" class="hidden px-3 pb-3 pt-1 border-t border-gray-100 dark:border-gray-700/50">
-                        <div class="flex gap-2">
-                            <input type="text" id="subtask-input-${task.id}" placeholder="Subtask name..." class="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-green-500">
-                            <button onclick="addSubtask('${task.id}', this)" class="px-2 py-1 bg-green-500 text-white rounded text-xs flex items-center justify-center min-w-[40px]">Add</button>
+                        <div class="flex flex-col gap-2">
+                            <div class="flex gap-2">
+                                <select id="subtask-type-${task.id}" class="text-xs bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 outline-none">
+                                    <option value="roadmap">Roadmap</option>
+                                    <option value="kpi">KPI</option>
+                                    <option value="kr">Key Result</option>
+                                </select>
+                                <input type="text" id="subtask-input-${task.id}" placeholder="Item description..." class="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:border-green-500">
+                            </div>
+                            <button onclick="addSubtask('${task.id}', this)" class="w-full py-1 bg-green-500 text-white rounded text-xs flex items-center justify-center font-bold hover:bg-green-600">Add Item</button>
                         </div>
                     </div>
                 `;
@@ -1061,27 +1095,29 @@
 
         window.addSubtask = async (taskId, btn) => {
             const input = document.getElementById(`subtask-input-${taskId}`);
+            const typeSelect = document.getElementById(`subtask-type-${taskId}`);
             const title = input.value;
+            const category = typeSelect.value;
+            
             if(!title) return;
             
-            // Loading UI
             const originalContent = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i>`;
             lucide.createIcons();
 
             try {
-                // <-- WRITE to Firestore Subcollection
                 await addDoc(getTaskSubtasksRef(taskId), {
+                    parent_task_id: taskId,
                     title: title,
+                    category: category,
                     is_completed: 0,
                     created_at: Date.now()
                 });
                 renderTasks();
             } catch (error) {
-                console.error("Error adding subtask:", error);
-                showSnackbar("Failed to add subtask", "error");
-                // Restore button state on error (success state is handled by re-render)
+                console.error("Error adding item:", error);
+                showSnackbar("Failed to add item", "error");
                 btn.disabled = false;
                 btn.innerHTML = originalContent;
             }
